@@ -15,7 +15,7 @@ export class StdioServerTransport implements Transport {
 
   constructor(
     private _stdin: Readable = process.stdin,
-    private _stdout: Writable = process.stdout,
+    private _stdout: Writable = process.stdout
   ) {}
 
   onclose?: () => void;
@@ -37,7 +37,7 @@ export class StdioServerTransport implements Transport {
   async start(): Promise<void> {
     if (this._started) {
       throw new Error(
-        "StdioServerTransport already started! If using Server class, note that connect() calls start() automatically.",
+        "StdioServerTransport already started! If using Server class, note that connect() calls start() automatically."
       );
     }
 
@@ -67,13 +67,13 @@ export class StdioServerTransport implements Transport {
     this._stdin.off("error", this._onerror);
 
     // Check if we were the only data listener
-    const remainingDataListeners = this._stdin.listenerCount('data');
+    const remainingDataListeners = this._stdin.listenerCount("data");
     if (remainingDataListeners === 0) {
       // Only pause stdin if we were the only listener
       // This prevents interfering with other parts of the application that might be using stdin
       this._stdin.pause();
     }
-    
+
     // Clear the buffer and notify closure
     this._readBuffer.clear();
     this.onclose?.();

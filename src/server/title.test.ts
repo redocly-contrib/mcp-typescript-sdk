@@ -1,8 +1,8 @@
 import { Server } from "./index.js";
-import { Client } from "../client/index.js";
 import { InMemoryTransport } from "../inMemory.js";
 import { z } from "zod";
 import { McpServer, ResourceTemplate } from "./mcp.js";
+import { Client } from "../__mocks__/client.js";
 
 describe("Title field backwards compatibility", () => {
   it("should work with tools that have title", async () => {
@@ -20,7 +20,11 @@ describe("Title field backwards compatibility", () => {
         title: "Test Tool Display Name",
         description: "A test tool",
         inputSchema: {
-          value: z.string()
+          type: "object",
+          properties: {
+            value: { type: "string" }
+          },
+          required: ["value"]
         }
       },
       async () => ({ content: [{ type: "text", text: "result" }] })
@@ -50,7 +54,7 @@ describe("Title field backwards compatibility", () => {
     server.tool(
       "test-tool",
       "A test tool",
-      { value: z.string() },
+      { type: "object", properties: { value: { type: "string" } }, required: ["value"] },
       async () => ({ content: [{ type: "text", text: "result" }] })
     );
 

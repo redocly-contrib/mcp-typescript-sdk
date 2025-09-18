@@ -17,9 +17,11 @@ type RemovePassthrough<T> = T extends object
   ? T extends Array<infer U>
     ? Array<RemovePassthrough<U>>
     : T extends Function
-        ? T
-        : {[K in keyof T as string extends K ? never : K]: RemovePassthrough<T[K]>}
-    : T;
+    ? T
+    : {
+        [K in keyof T as string extends K ? never : K]: RemovePassthrough<T[K]>;
+      }
+  : T;
 
 // Adds the `jsonrpc` property to a type, to match the on-wire format of notifications.
 type WithJSONRPC<T> = T & { jsonrpc: "2.0" };
@@ -27,31 +29,53 @@ type WithJSONRPC<T> = T & { jsonrpc: "2.0" };
 // Adds the `jsonrpc` and `id` properties to a type, to match the on-wire format of requests.
 type WithJSONRPCRequest<T> = T & { jsonrpc: "2.0"; id: SDKTypes.RequestId };
 
-type IsUnknown<T> = [unknown] extends [T] ? [T] extends [unknown] ? true : false : false;
+type IsUnknown<T> = [unknown] extends [T]
+  ? [T] extends [unknown]
+    ? true
+    : false
+  : false;
 
 // Turns {x?: unknown} into {x: unknown} but keeps {_meta?: unknown} unchanged (and leaves other optional properties unchanged, e.g. {x?: string}).
 // This works around an apparent quirk of ZodObject.unknown() (makes fields optional)
-type MakeUnknownsNotOptional<T> =
-  IsUnknown<T> extends true
-    ? unknown
-    : (T extends object
-      ? (T extends Array<infer U>
-        ? Array<MakeUnknownsNotOptional<U>>
-        : (T extends Function
-          ? T
-          : Pick<T, never> & {
-            // Start with empty object to avoid duplicates
-            // Make unknown properties required (except _meta)
-            [K in keyof T as '_meta' extends K ? never : IsUnknown<T[K]> extends true ? K : never]-?: unknown;
-          } &
-          Pick<T, {
+type MakeUnknownsNotOptional<T> = IsUnknown<T> extends true
+  ? unknown
+  : T extends object
+  ? T extends Array<infer U>
+    ? Array<MakeUnknownsNotOptional<U>>
+    : T extends Function
+    ? T
+    : Pick<T, never> & {
+        // Start with empty object to avoid duplicates
+        // Make unknown properties required (except _meta)
+        [K in keyof T as "_meta" extends K
+          ? never
+          : IsUnknown<T[K]> extends true
+          ? K
+          : never]-?: unknown;
+      } & Pick<
+          T,
+          {
             // Pick all _meta and non-unknown properties with original modifiers
-            [K in keyof T]: '_meta' extends K ? K : IsUnknown<T[K]> extends true ? never : K
-          }[keyof T]> & {
-            // Recurse on the picked properties
-            [K in keyof Pick<T, {[K in keyof T]: '_meta' extends K ? K : IsUnknown<T[K]> extends true ? never : K}[keyof T]>]: MakeUnknownsNotOptional<T[K]>
-          }))
-      : T);
+            [K in keyof T]: "_meta" extends K
+              ? K
+              : IsUnknown<T[K]> extends true
+              ? never
+              : K;
+          }[keyof T]
+        > & {
+          // Recurse on the picked properties
+          [K in keyof Pick<
+            T,
+            {
+              [K in keyof T]: "_meta" extends K
+                ? K
+                : IsUnknown<T[K]> extends true
+                ? never
+                : K;
+            }[keyof T]
+          >]: MakeUnknownsNotOptional<T[K]>;
+        }
+  : T;
 
 function checkCancelledNotification(
   sdk: WithJSONRPC<SDKTypes.CancelledNotification>,
@@ -166,31 +190,19 @@ function checkProgressToken(
   sdk = spec;
   spec = sdk;
 }
-function checkCursor(
-  sdk: SDKTypes.Cursor,
-  spec: SpecTypes.Cursor
-) {
+function checkCursor(sdk: SDKTypes.Cursor, spec: SpecTypes.Cursor) {
   sdk = spec;
   spec = sdk;
 }
-function checkRequest(
-  sdk: SDKTypes.Request,
-  spec: SpecTypes.Request
-) {
+function checkRequest(sdk: SDKTypes.Request, spec: SpecTypes.Request) {
   sdk = spec;
   spec = sdk;
 }
-function checkResult(
-  sdk: SDKTypes.Result,
-  spec: SpecTypes.Result
-) {
+function checkResult(sdk: SDKTypes.Result, spec: SpecTypes.Result) {
   sdk = spec;
   spec = sdk;
 }
-function checkRequestId(
-  sdk: SDKTypes.RequestId,
-  spec: SpecTypes.RequestId
-) {
+function checkRequestId(sdk: SDKTypes.RequestId, spec: SpecTypes.RequestId) {
   sdk = spec;
   spec = sdk;
 }
@@ -643,7 +655,9 @@ function checkServerRequest(
   spec = sdk;
 }
 function checkLoggingMessageNotification(
-  sdk: MakeUnknownsNotOptional<WithJSONRPC<SDKTypes.LoggingMessageNotification>>,
+  sdk: MakeUnknownsNotOptional<
+    WithJSONRPC<SDKTypes.LoggingMessageNotification>
+  >,
   spec: SpecTypes.LoggingMessageNotification
 ) {
   sdk = spec;
@@ -670,40 +684,61 @@ function checkIcon(
   sdk = spec;
   spec = sdk;
 }
+function checkIcons(sdk: unknown, spec: unknown) {
+  sdk = spec;
+  spec = sdk;
+}
+function checkModelHint(
+  sdk: RemovePassthrough<SDKTypes.ModelHint>,
+  spec: SpecTypes.ModelHint
+) {
+  sdk = spec;
+  spec = sdk;
+}
+function checkModelPreferences(
+  sdk: RemovePassthrough<SDKTypes.ModelPreferences>,
+  spec: SpecTypes.ModelPreferences
+) {
+  sdk = spec;
+  spec = sdk;
+}
 
 // This file is .gitignore'd, and fetched by `npm run fetch:spec-types` (called by `npm run test`)
-const SPEC_TYPES_FILE  = 'spec.types.ts';
-const SDK_TYPES_FILE  = 'src/types.ts';
+const SPEC_TYPES_FILE = "spec.types.ts";
+const SDK_TYPES_FILE = "src/types.ts";
 
 const MISSING_SDK_TYPES = [
   // These are inlined in the SDK:
-  'Role',
-  'Error', // The inner error object of a JSONRPCError
+  "Role",
+  "Error", // The inner error object of a JSONRPCError
 
   // These aren't supported by the SDK yet:
   // TODO: Add definitions to the SDK
-  'Annotations',
-  'ModelHint',
-  'ModelPreferences',
-  'Icons',
-]
+  "Annotations",
+];
 
 function extractExportedTypes(source: string): string[] {
-  return [...source.matchAll(/export\s+(?:interface|class|type)\s+(\w+)\b/g)].map(m => m[1]);
+  return [
+    ...source.matchAll(/export\s+(?:interface|class|type)\s+(\w+)\b/g),
+  ].map((m) => m[1]);
 }
 
-describe('Spec Types', () => {
-  const specTypes = extractExportedTypes(fs.readFileSync(SPEC_TYPES_FILE, 'utf-8'));
-  const sdkTypes = extractExportedTypes(fs.readFileSync(SDK_TYPES_FILE, 'utf-8'));
-  const testSource = fs.readFileSync(__filename, 'utf-8');
+describe("Spec Types", () => {
+  const specTypes = extractExportedTypes(
+    fs.readFileSync(SPEC_TYPES_FILE, "utf-8")
+  );
+  const sdkTypes = extractExportedTypes(
+    fs.readFileSync(SDK_TYPES_FILE, "utf-8")
+  );
+  const testSource = fs.readFileSync(__filename, "utf-8");
 
-  it('should define some expected types', () => {
-    expect(specTypes).toContain('JSONRPCNotification');
-    expect(specTypes).toContain('ElicitResult');
+  it("should define some expected types", () => {
+    expect(specTypes).toContain("JSONRPCNotification");
+    expect(specTypes).toContain("ElicitResult");
     expect(specTypes).toHaveLength(94);
   });
 
-  it('should have up to date list of missing sdk types', () => {
+  it("should have up to date list of missing sdk types", () => {
     for (const typeName of MISSING_SDK_TYPES) {
       expect(sdkTypes).not.toContain(typeName);
     }

@@ -1,6 +1,6 @@
 import { InMemoryTransport } from "./inMemory.js";
 import { JSONRPCMessage } from "./types.js";
-import { AuthInfo } from "./server/auth/types.js";
+import { AuthInfo } from "./server/types.js";
 
 describe("InMemoryTransport", () => {
   let clientTransport: InMemoryTransport;
@@ -98,7 +98,7 @@ describe("InMemoryTransport", () => {
   test("should throw error when sending after close", async () => {
     await clientTransport.close();
     await expect(
-      clientTransport.send({ jsonrpc: "2.0", method: "test", id: 1 }),
+      clientTransport.send({ jsonrpc: "2.0", method: "test", id: 1 })
     ).rejects.toThrow("Not connected");
   });
 

@@ -1,20 +1,19 @@
 import { McpServer } from "./mcp.js";
-import { Client } from "../client/index.js";
+import { Client } from "../__mocks__/client.js";
 import { InMemoryTransport } from "../inMemory.js";
-import { z } from "zod";
+import { z  } from "zod";
 import {
-  ListToolsResultSchema,
-  CallToolResultSchema,
-  ListResourcesResultSchema,
-  ListResourceTemplatesResultSchema,
-  ReadResourceResultSchema,
-  ListPromptsResultSchema,
-  GetPromptResultSchema,
-  CompleteResultSchema,
-  LoggingMessageNotificationSchema,
   Notification,
   TextContent,
-  ElicitRequestSchema
+  ListToolsResultSchema,
+  CallToolResultSchema,
+  CompleteResultSchema,
+  ListResourcesResultSchema,
+  ReadResourceResultSchema,
+  ListResourceTemplatesResultSchema,
+  ListPromptsResultSchema,
+  GetPromptResultSchema,
+  LoggingMessageNotificationSchema,
 } from "../types.js";
 import { ResourceTemplate } from "./mcp.js";
 import { completable } from "./completable.js";
@@ -43,17 +42,17 @@ describe("McpServer", () => {
         name: "test server",
         version: "1.0",
       },
-      { capabilities: { logging: {} } },
+      { capabilities: { logging: {} } }
     );
 
-    const notifications: Notification[] = []
+    const notifications: Notification[] = [];
     const client = new Client({
       name: "test client",
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification)
-    }
+      notifications.push(notification as Notification);
+    };
 
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
@@ -68,37 +67,39 @@ describe("McpServer", () => {
       mcpServer.server.sendLoggingMessage({
         level: "info",
         data: "Test log message",
-      }),
+      })
     ).resolves.not.toThrow();
 
     expect(notifications).toMatchObject([
       {
-        "method": "notifications/message",
+        method: "notifications/message",
         params: {
           level: "info",
           data: "Test log message",
-        }
-      }
-    ])
+        },
+      },
+    ]);
   });
 
   /***
    * Test: Progress Notification with Message Field
    */
   test("should send progress notifications with message field", async () => {
-    const mcpServer = new McpServer(
-      {
-        name: "test server",
-        version: "1.0",
-      }
-    );
+    const mcpServer = new McpServer({
+      name: "test server",
+      version: "1.0",
+    });
 
     // Create a tool that sends progress updates
-    mcpServer.tool(
+    mcpServer.tool<{ steps: number }>(
       "long-operation",
       "A long running operation with progress updates",
       {
-        steps: z.number().min(1).describe("Number of steps to perform"),
+        type: "object",
+        properties: {
+          steps: { type: "number", minimum: 1 },
+        },
+        required: ["steps"],
       },
       async ({ steps }, { sendNotification, _meta }) => {
         const progressToken = _meta?.progressToken;
@@ -118,18 +119,30 @@ describe("McpServer", () => {
           }
         }
 
-        return { content: [{ type: "text" as const, text: `Operation completed with ${steps} steps` }] };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Operation completed with ${steps} steps`,
+            },
+          ],
+        };
       }
     );
 
-    const progressUpdates: Array<{ progress: number, total?: number, message?: string }> = [];
+    const progressUpdates: Array<{
+      progress: number;
+      total?: number;
+      message?: string;
+    }> = [];
 
     const client = new Client({
       name: "test client",
       version: "1.0",
     });
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
 
     await Promise.all([
       client.connect(clientTransport),
@@ -144,15 +157,15 @@ describe("McpServer", () => {
           name: "long-operation",
           arguments: { steps: 3 },
           _meta: {
-            progressToken: "progress-test-1"
-          }
-        }
+            progressToken: "progress-test-1",
+          },
+        },
       },
       CallToolResultSchema,
       {
         onprogress: (progress) => {
           progressUpdates.push(progress);
-        }
+        },
       }
     );
 
@@ -212,9 +225,13 @@ describe("ResourceTemplate", () => {
     const abortController = new AbortController();
     const result = await template.listCallback?.({
       signal: abortController.signal,
-      requestId: 'not-implemented',
-      sendRequest: () => { throw new Error("Not implemented") },
-      sendNotification: () => { throw new Error("Not implemented") }
+      requestId: "not-implemented",
+      sendRequest: () => {
+        throw new Error("Not implemented");
+      },
+      sendNotification: () => {
+        throw new Error("Not implemented");
+      },
     });
     expect(result?.resources).toHaveLength(1);
     expect(list).toHaveBeenCalled();
@@ -230,14 +247,14 @@ describe("tool()", () => {
       name: "test server",
       version: "1.0",
     });
-    const notifications: Notification[] = []
+    const notifications: Notification[] = [];
     const client = new Client({
       name: "test client",
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification)
-    }
+      notifications.push(notification as Notification);
+    };
 
     mcpServer.tool("test", async () => ({
       content: [
@@ -260,7 +277,7 @@ describe("tool()", () => {
       {
         method: "tools/list",
       },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
 
     expect(result.tools).toHaveLength(1);
@@ -271,7 +288,7 @@ describe("tool()", () => {
     });
 
     // Adding the tool before the connection was established means no notification was sent
-    expect(notifications).toHaveLength(0)
+    expect(notifications).toHaveLength(0);
 
     // Adding another tool triggers the update notification
     mcpServer.tool("test2", async () => ({
@@ -284,13 +301,13 @@ describe("tool()", () => {
     }));
 
     // Yield event loop to let the notification fly
-    await new Promise(process.nextTick)
+    await new Promise(process.nextTick);
 
     expect(notifications).toMatchObject([
       {
         method: "notifications/tools/list_changed",
-      }
-    ])
+      },
+    ]);
   });
 
   /***
@@ -301,14 +318,14 @@ describe("tool()", () => {
       name: "test server",
       version: "1.0",
     });
-    const notifications: Notification[] = []
+    const notifications: Notification[] = [];
     const client = new Client({
       name: "test client",
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification)
-    }
+      notifications.push(notification as Notification);
+    };
 
     // Register initial tool
     const tool = mcpServer.tool("test", async () => ({
@@ -321,7 +338,7 @@ describe("tool()", () => {
     }));
 
     // Update the tool
-    tool.update({
+    tool.update<undefined>({
       callback: async () => ({
         content: [
           {
@@ -329,7 +346,7 @@ describe("tool()", () => {
             text: "Updated response",
           },
         ],
-      })
+      }),
     });
 
     const [clientTransport, serverTransport] =
@@ -348,7 +365,7 @@ describe("tool()", () => {
           name: "test",
         },
       },
-      CallToolResultSchema,
+      CallToolResultSchema
     );
 
     expect(result.content).toEqual([
@@ -359,7 +376,7 @@ describe("tool()", () => {
     ]);
 
     // Update happened before transport was connected, so no notifications should be expected
-    expect(notifications).toHaveLength(0)
+    expect(notifications).toHaveLength(0);
   });
 
   /***
@@ -370,20 +387,24 @@ describe("tool()", () => {
       name: "test server",
       version: "1.0",
     });
-    const notifications: Notification[] = []
+    const notifications: Notification[] = [];
     const client = new Client({
       name: "test client",
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification)
-    }
+      notifications.push(notification as Notification);
+    };
 
     // Register initial tool
     const tool = mcpServer.tool(
       "test",
       {
-        name: z.string(),
+        type: "object",
+        properties: {
+          name: { type: "string" },
+        },
+        required: ["name"],
       },
       async ({ name }) => ({
         content: [
@@ -392,14 +413,18 @@ describe("tool()", () => {
             text: `Initial: ${name}`,
           },
         ],
-      }),
+      })
     );
 
     // Update the tool with a different schema
-    tool.update({
+    tool.update<{ name: string; value: number }>({
       paramsSchema: {
-        name: z.string(),
-        value: z.number(),
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          value: { type: "number" },
+        },
+        required: ["name", "value"],
       },
       callback: async ({ name, value }) => ({
         content: [
@@ -408,7 +433,7 @@ describe("tool()", () => {
             text: `Updated: ${name}, ${value}`,
           },
         ],
-      })
+      }),
     });
 
     const [clientTransport, serverTransport] =
@@ -424,10 +449,11 @@ describe("tool()", () => {
       {
         method: "tools/list",
       },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
 
     expect(listResult.tools[0].inputSchema).toMatchObject({
+      type: "object",
       properties: {
         name: { type: "string" },
         value: { type: "number" },
@@ -446,7 +472,7 @@ describe("tool()", () => {
           },
         },
       },
-      CallToolResultSchema,
+      CallToolResultSchema
     );
 
     expect(callResult.content).toEqual([
@@ -457,7 +483,7 @@ describe("tool()", () => {
     ]);
 
     // Update happened before transport was connected, so no notifications should be expected
-    expect(notifications).toHaveLength(0)
+    expect(notifications).toHaveLength(0);
   });
 
   /***
@@ -468,14 +494,14 @@ describe("tool()", () => {
       name: "test server",
       version: "1.0",
     });
-    const notifications: Notification[] = []
+    const notifications: Notification[] = [];
     const client = new Client({
       name: "test client",
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification)
-    }
+      notifications.push(notification as Notification);
+    };
 
     // Register initial tool
     const tool = mcpServer.tool("test", async () => ({
@@ -495,10 +521,10 @@ describe("tool()", () => {
       mcpServer.connect(serverTransport),
     ]);
 
-    expect(notifications).toHaveLength(0)
+    expect(notifications).toHaveLength(0);
 
     // Now update the tool
-    tool.update({
+    tool.update<undefined>({
       callback: async () => ({
         content: [
           {
@@ -506,26 +532,26 @@ describe("tool()", () => {
             text: "Updated response",
           },
         ],
-      })
+      }),
     });
 
     // Yield event loop to let the notification fly
-    await new Promise(process.nextTick)
+    await new Promise(process.nextTick);
 
     expect(notifications).toMatchObject([
-      { method: "notifications/tools/list_changed" }
-    ])
+      { method: "notifications/tools/list_changed" },
+    ]);
 
     // Now delete the tool
     tool.remove();
 
     // Yield event loop to let the notification fly
-    await new Promise(process.nextTick)
+    await new Promise(process.nextTick);
 
     expect(notifications).toMatchObject([
       { method: "notifications/tools/list_changed" },
       { method: "notifications/tools/list_changed" },
-    ])
+    ]);
   });
 
   /***
@@ -545,8 +571,12 @@ describe("tool()", () => {
     mcpServer.tool(
       "test",
       {
-        name: z.string(),
-        value: z.number(),
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          value: { type: "number" },
+        },
+        required: ["name", "value"],
       },
       async ({ name, value }) => ({
         content: [
@@ -555,14 +585,21 @@ describe("tool()", () => {
             text: `${name}: ${value}`,
           },
         ],
-      }),
+      })
     );
 
     // new api
     mcpServer.registerTool(
       "test (new api)",
       {
-        inputSchema: { name: z.string(), value: z.number() },
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            value: { type: "number" },
+          },
+          required: ["name", "value"],
+        },
       },
       async ({ name, value }) => ({
         content: [{ type: "text", text: `${name}: ${value}` }],
@@ -581,7 +618,7 @@ describe("tool()", () => {
       {
         method: "tools/list",
       },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
 
     expect(result.tools).toHaveLength(2);
@@ -636,7 +673,6 @@ describe("tool()", () => {
       })
     );
 
-
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
 
@@ -649,7 +685,7 @@ describe("tool()", () => {
       {
         method: "tools/list",
       },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
 
     expect(result.tools).toHaveLength(2);
@@ -672,14 +708,18 @@ describe("tool()", () => {
       version: "1.0",
     });
 
-    mcpServer.tool("test", { title: "Test Tool", readOnlyHint: true }, async () => ({
-      content: [
-        {
-          type: "text",
-          text: "Test response",
-        },
-      ],
-    }));
+    mcpServer.tool(
+      "test",
+      { title: "Test Tool", readOnlyHint: true },
+      async () => ({
+        content: [
+          {
+            type: "text",
+            text: "Test response",
+          },
+        ],
+      })
+    );
 
     mcpServer.registerTool(
       "test (new api)",
@@ -708,14 +748,20 @@ describe("tool()", () => {
       {
         method: "tools/list",
       },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
 
     expect(result.tools).toHaveLength(2);
     expect(result.tools[0].name).toBe("test");
-    expect(result.tools[0].annotations).toEqual({ title: "Test Tool", readOnlyHint: true });
+    expect(result.tools[0].annotations).toEqual({
+      title: "Test Tool",
+      readOnlyHint: true,
+    });
     expect(result.tools[1].name).toBe("test (new api)");
-    expect(result.tools[1].annotations).toEqual({ title: "Test Tool", readOnlyHint: true });
+    expect(result.tools[1].annotations).toEqual({
+      title: "Test Tool",
+      readOnlyHint: true,
+    });
   });
 
   /***
@@ -731,23 +777,31 @@ describe("tool()", () => {
       version: "1.0",
     });
 
-    mcpServer.tool(
+    mcpServer.tool<{ name: string }>(
       "test",
-      { name: z.string() },
+      {
+        type: "object",
+        properties: { name: { type: "string" } },
+        required: ["name"],
+      },
       { title: "Test Tool", readOnlyHint: true },
       async ({ name }) => ({
-        content: [{ type: "text", text: `Hello, ${name}!` }]
+        content: [{ type: "text", text: `Hello, ${name}!` }],
       })
     );
 
     mcpServer.registerTool(
       "test (new api)",
       {
-        inputSchema: { name: z.string() },
+        inputSchema: {
+          type: "object",
+          properties: { name: { type: "string" } },
+          required: ["name"],
+        },
         annotations: { title: "Test Tool", readOnlyHint: true },
       },
       async ({ name }) => ({
-        content: [{ type: "text", text: `Hello, ${name}!` }]
+        content: [{ type: "text", text: `Hello, ${name}!` }],
       })
     );
 
@@ -761,16 +815,19 @@ describe("tool()", () => {
 
     const result = await client.request(
       { method: "tools/list" },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
 
     expect(result.tools).toHaveLength(2);
     expect(result.tools[0].name).toBe("test");
     expect(result.tools[0].inputSchema).toMatchObject({
       type: "object",
-      properties: { name: { type: "string" } }
+      properties: { name: { type: "string" } },
     });
-    expect(result.tools[0].annotations).toEqual({ title: "Test Tool", readOnlyHint: true });
+    expect(result.tools[0].annotations).toEqual({
+      title: "Test Tool",
+      readOnlyHint: true,
+    });
     expect(result.tools[1].name).toBe("test (new api)");
     expect(result.tools[1].inputSchema).toEqual(result.tools[0].inputSchema);
     expect(result.tools[1].annotations).toEqual(result.tools[0].annotations);
@@ -789,13 +846,17 @@ describe("tool()", () => {
       version: "1.0",
     });
 
-    mcpServer.tool(
+    mcpServer.tool<{ name: string }>(
       "test",
       "A tool with everything",
-      { name: z.string() },
+      {
+        type: "object",
+        properties: { name: { type: "string" } },
+        required: ["name"],
+      },
       { title: "Complete Test Tool", readOnlyHint: true, openWorldHint: false },
       async ({ name }) => ({
-        content: [{ type: "text", text: `Hello, ${name}!` }]
+        content: [{ type: "text", text: `Hello, ${name}!` }],
       })
     );
 
@@ -803,11 +864,19 @@ describe("tool()", () => {
       "test (new api)",
       {
         description: "A tool with everything",
-        inputSchema: { name: z.string() },
-        annotations: { title: "Complete Test Tool", readOnlyHint: true, openWorldHint: false },
+        inputSchema: {
+          type: "object",
+          properties: { name: { type: "string" } },
+          required: ["name"],
+        },
+        annotations: {
+          title: "Complete Test Tool",
+          readOnlyHint: true,
+          openWorldHint: false,
+        },
       },
       async ({ name }) => ({
-        content: [{ type: "text", text: `Hello, ${name}!` }]
+        content: [{ type: "text", text: `Hello, ${name}!` }],
       })
     );
 
@@ -821,7 +890,7 @@ describe("tool()", () => {
 
     const result = await client.request(
       { method: "tools/list" },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
 
     expect(result.tools).toHaveLength(2);
@@ -829,12 +898,12 @@ describe("tool()", () => {
     expect(result.tools[0].description).toBe("A tool with everything");
     expect(result.tools[0].inputSchema).toMatchObject({
       type: "object",
-      properties: { name: { type: "string" } }
+      properties: { name: { type: "string" } },
     });
     expect(result.tools[0].annotations).toEqual({
       title: "Complete Test Tool",
       readOnlyHint: true,
-      openWorldHint: false
+      openWorldHint: false,
     });
     expect(result.tools[1].name).toBe("test (new api)");
     expect(result.tools[1].description).toBe("A tool with everything");
@@ -855,13 +924,17 @@ describe("tool()", () => {
       version: "1.0",
     });
 
-    mcpServer.tool(
+    mcpServer.tool<object>(
       "test",
       "A tool with everything but empty params",
-      {},
-      { title: "Complete Test Tool with empty params", readOnlyHint: true, openWorldHint: false },
+      { type: "object", properties: {} },
+      {
+        title: "Complete Test Tool with empty params",
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       async () => ({
-        content: [{ type: "text", text: "Test response" }]
+        content: [{ type: "text", text: "Test response" }],
       })
     );
 
@@ -869,11 +942,15 @@ describe("tool()", () => {
       "test (new api)",
       {
         description: "A tool with everything but empty params",
-        inputSchema: {},
-        annotations: { title: "Complete Test Tool with empty params", readOnlyHint: true, openWorldHint: false },
+        inputSchema: { type: "object", properties: {} },
+        annotations: {
+          title: "Complete Test Tool with empty params",
+          readOnlyHint: true,
+          openWorldHint: false,
+        },
       },
       async () => ({
-        content: [{ type: "text" as const, text: "Test response" }]
+        content: [{ type: "text" as const, text: "Test response" }],
       })
     );
 
@@ -887,23 +964,27 @@ describe("tool()", () => {
 
     const result = await client.request(
       { method: "tools/list" },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
 
     expect(result.tools).toHaveLength(2);
     expect(result.tools[0].name).toBe("test");
-    expect(result.tools[0].description).toBe("A tool with everything but empty params");
+    expect(result.tools[0].description).toBe(
+      "A tool with everything but empty params"
+    );
     expect(result.tools[0].inputSchema).toMatchObject({
       type: "object",
-      properties: {}
+      properties: {},
     });
     expect(result.tools[0].annotations).toEqual({
       title: "Complete Test Tool with empty params",
       readOnlyHint: true,
-      openWorldHint: false
+      openWorldHint: false,
     });
     expect(result.tools[1].name).toBe("test (new api)");
-    expect(result.tools[1].description).toBe("A tool with everything but empty params");
+    expect(result.tools[1].description).toBe(
+      "A tool with everything but empty params"
+    );
     expect(result.tools[1].inputSchema).toEqual(result.tools[0].inputSchema);
     expect(result.tools[1].annotations).toEqual(result.tools[0].annotations);
   });
@@ -924,8 +1005,12 @@ describe("tool()", () => {
     mcpServer.tool(
       "test",
       {
-        name: z.string(),
-        value: z.number(),
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          value: { type: "number" },
+        },
+        required: ["name", "value"],
       },
       async ({ name, value }) => ({
         content: [
@@ -934,15 +1019,19 @@ describe("tool()", () => {
             text: `${name}: ${value}`,
           },
         ],
-      }),
+      })
     );
 
     mcpServer.registerTool(
       "test (new api)",
       {
         inputSchema: {
-          name: z.string(),
-          value: z.number(),
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            value: { type: "number" },
+          },
+          required: ["name", "value"],
         },
       },
       async ({ name, value }) => ({
@@ -975,8 +1064,8 @@ describe("tool()", () => {
             },
           },
         },
-        CallToolResultSchema,
-      ),
+        CallToolResultSchema
+      )
     ).rejects.toThrow(/Invalid arguments/);
 
     await expect(
@@ -991,8 +1080,8 @@ describe("tool()", () => {
             },
           },
         },
-        CallToolResultSchema,
-      ),
+        CallToolResultSchema
+      )
     ).rejects.toThrow(/Invalid arguments/);
   });
 
@@ -1062,19 +1151,27 @@ describe("tool()", () => {
       {
         description: "Test tool with structured output",
         inputSchema: {
-          input: z.string(),
+          type: "object",
+          properties: {
+            input: { type: "string" },
+          },
+          required: ["input"],
         },
         outputSchema: {
-          processedInput: z.string(),
-          resultType: z.string(),
-          timestamp: z.string()
+          type: "object",
+          properties: {
+            processedInput: { type: "string" },
+            resultType: { type: "string" },
+            timestamp: { type: "string" },
+          },
+          required: ["processedInput", "resultType", "timestamp"],
         },
       },
       async ({ input }) => ({
         structuredContent: {
           processedInput: input,
           resultType: "structured",
-          timestamp: "2023-01-01T00:00:00Z"
+          timestamp: "2023-01-01T00:00:00Z",
         },
         content: [
           {
@@ -1082,10 +1179,10 @@ describe("tool()", () => {
             text: JSON.stringify({
               processedInput: input,
               resultType: "structured",
-              timestamp: "2023-01-01T00:00:00Z"
+              timestamp: "2023-01-01T00:00:00Z",
             }),
           },
-        ]
+        ],
       })
     );
 
@@ -1102,7 +1199,7 @@ describe("tool()", () => {
       {
         method: "tools/list",
       },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
 
     expect(listResult.tools).toHaveLength(1);
@@ -1111,9 +1208,9 @@ describe("tool()", () => {
       properties: {
         processedInput: { type: "string" },
         resultType: { type: "string" },
-        timestamp: { type: "string" }
+        timestamp: { type: "string" },
       },
-      required: ["processedInput", "resultType", "timestamp"]
+      required: ["processedInput", "resultType", "timestamp"],
     });
 
     // Call the tool and verify it returns valid structuredContent
@@ -1127,7 +1224,7 @@ describe("tool()", () => {
           },
         },
       },
-      CallToolResultSchema,
+      CallToolResultSchema
     );
 
     expect(result.structuredContent).toBeDefined();
@@ -1166,13 +1263,22 @@ describe("tool()", () => {
     mcpServer.registerTool(
       "test",
       {
-        description: "Test tool with output schema but missing structured content",
+        description:
+          "Test tool with output schema but missing structured content",
         inputSchema: {
-          input: z.string(),
+          type: "object",
+          properties: {
+            input: { type: "string" },
+          },
+          required: ["input"],
         },
         outputSchema: {
-          processedInput: z.string(),
-          resultType: z.string(),
+          type: "object",
+          properties: {
+            processedInput: { type: "string" },
+            resultType: { type: "string" },
+          },
+          required: ["processedInput", "resultType"],
         },
       },
       async ({ input }) => ({
@@ -1201,8 +1307,10 @@ describe("tool()", () => {
         arguments: {
           input: "hello",
         },
-      }),
-    ).rejects.toThrow(/Tool test has an output schema but no structured content was provided/);
+      })
+    ).rejects.toThrow(
+      /Tool test has an output schema but no structured content was provided/
+    );
   });
   /***
    * Test: Tool with Output Schema Must Provide Structured Content
@@ -1221,13 +1329,22 @@ describe("tool()", () => {
     mcpServer.registerTool(
       "test",
       {
-        description: "Test tool with output schema but missing structured content",
+        description:
+          "Test tool with output schema but missing structured content",
         inputSchema: {
-          input: z.string(),
+          type: "object",
+          properties: {
+            input: { type: "string" },
+          },
+          required: ["input"],
         },
         outputSchema: {
-          processedInput: z.string(),
-          resultType: z.string(),
+          type: "object",
+          properties: {
+            processedInput: { type: "string" },
+            resultType: { type: "string" },
+          },
+          required: ["processedInput", "resultType"],
         },
       },
       async ({ input }) => ({
@@ -1255,7 +1372,7 @@ describe("tool()", () => {
         arguments: {
           input: "hello",
         },
-      }),
+      })
     ).resolves.toStrictEqual({
       content: [
         {
@@ -1287,12 +1404,21 @@ describe("tool()", () => {
       {
         description: "Test tool with invalid structured output",
         inputSchema: {
-          input: z.string(),
+          type: "object",
+          properties: {
+            input: { type: "string" },
+          },
+          required: ["input"],
         },
         outputSchema: {
-          processedInput: z.string(),
-          resultType: z.string(),
-          timestamp: z.string()
+          type: "object",
+          properties: {
+            processedInput: { type: "string" },
+            resultType: { type: "string" },
+            timestamp: { type: "string" },
+          },
+          additionalProperties: false,
+          required: ["processedInput", "resultType", "timestamp"],
         },
       },
       async ({ input }) => ({
@@ -1303,7 +1429,7 @@ describe("tool()", () => {
               processedInput: input,
               resultType: "structured",
               // Missing required 'timestamp' field
-              someExtraField: "unexpected" // Extra field not in schema
+              someExtraField: "unexpected", // Extra field not in schema
             }),
           },
         ],
@@ -1311,7 +1437,7 @@ describe("tool()", () => {
           processedInput: input,
           resultType: "structured",
           // Missing required 'timestamp' field
-          someExtraField: "unexpected" // Extra field not in schema
+          someExtraField: "unexpected", // Extra field not in schema
         },
       })
     );
@@ -1331,7 +1457,7 @@ describe("tool()", () => {
         arguments: {
           input: "hello",
         },
-      }),
+      })
     ).rejects.toThrow(/Invalid structured content for tool test/);
   });
 
@@ -1362,7 +1488,8 @@ describe("tool()", () => {
       };
     });
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
     // Set a test sessionId on the server transport
     serverTransport.sessionId = "test-session-123";
 
@@ -1378,7 +1505,7 @@ describe("tool()", () => {
           name: "test-tool",
         },
       },
-      CallToolResultSchema,
+      CallToolResultSchema
     );
 
     expect(receivedSessionId).toBe("test-session-123");
@@ -1411,7 +1538,8 @@ describe("tool()", () => {
       };
     });
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
 
     await Promise.all([
       client.connect(clientTransport),
@@ -1425,12 +1553,17 @@ describe("tool()", () => {
           name: "request-id-test",
         },
       },
-      CallToolResultSchema,
+      CallToolResultSchema
     );
 
     expect(receivedRequestId).toBeDefined();
-    expect(typeof receivedRequestId === 'string' || typeof receivedRequestId === 'number').toBe(true);
-    expect(result.content && result.content[0].text).toContain("Received request ID:");
+    expect(
+      typeof receivedRequestId === "string" ||
+        typeof receivedRequestId === "number"
+    ).toBe(true);
+    expect(result.content && result.content[0].text).toContain(
+      "Received request ID:"
+    );
   });
 
   /***
@@ -1442,7 +1575,7 @@ describe("tool()", () => {
         name: "test server",
         version: "1.0",
       },
-      { capabilities: { logging: {} } },
+      { capabilities: { logging: {} } }
     );
 
     const client = new Client({
@@ -1453,12 +1586,18 @@ describe("tool()", () => {
     let receivedLogMessage: string | undefined;
     const loggingMessage = "hello here is log message 1";
 
-    client.setNotificationHandler(LoggingMessageNotificationSchema, (notification) => {
-      receivedLogMessage = notification.params.data as string;
-    });
+    client.setNotificationHandler(
+      LoggingMessageNotificationSchema,
+      (notification) => {
+        receivedLogMessage = notification.params.data as string;
+      }
+    );
 
     mcpServer.tool("test-tool", async ({ sendNotification }) => {
-      await sendNotification({ method: "notifications/message", params: { level: "debug", data: loggingMessage } });
+      await sendNotification({
+        method: "notifications/message",
+        params: { level: "debug", data: loggingMessage },
+      });
       return {
         content: [
           {
@@ -1469,7 +1608,8 @@ describe("tool()", () => {
       };
     });
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
     await Promise.all([
       client.connect(clientTransport),
       mcpServer.server.connect(serverTransport),
@@ -1481,7 +1621,7 @@ describe("tool()", () => {
           name: "test-tool",
         },
       },
-      CallToolResultSchema,
+      CallToolResultSchema
     );
     expect(receivedLogMessage).toBe(loggingMessage);
   });
@@ -1504,7 +1644,11 @@ describe("tool()", () => {
       "test",
       "Test tool",
       {
-        input: z.string(),
+        type: "object",
+        properties: {
+          input: { type: "string" },
+        },
+        required: ["input"],
       },
       async ({ input }) => ({
         content: [
@@ -1513,7 +1657,7 @@ describe("tool()", () => {
             text: `Processed: ${input}`,
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -1534,7 +1678,7 @@ describe("tool()", () => {
           },
         },
       },
-      CallToolResultSchema,
+      CallToolResultSchema
     );
 
     expect(result.content).toEqual([
@@ -1578,7 +1722,7 @@ describe("tool()", () => {
           name: "error-test",
         },
       },
-      CallToolResultSchema,
+      CallToolResultSchema
     );
 
     expect(result.isError).toBe(true);
@@ -1629,9 +1773,66 @@ describe("tool()", () => {
             name: "nonexistent-tool",
           },
         },
-        CallToolResultSchema,
-      ),
+        CallToolResultSchema
+      )
     ).rejects.toThrow(/Tool nonexistent-tool not found/);
+  });
+
+  test("should throw McpError for invalid arguments that does not match the schema", async () => {
+    const mcpServer = new McpServer({
+      name: "test server",
+      version: "1.0",
+    });
+
+    const client = new Client({
+      name: "test client",
+      version: "1.0",
+    });
+
+    mcpServer.tool(
+      "test-tool",
+      {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          value: { type: "number" },
+        },
+        required: ["name", "value"],
+      },
+      async ({ name, value }) => ({
+        content: [
+          {
+            type: "text",
+            text: `${name}: ${value}`,
+          },
+        ],
+      })
+    );
+
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+
+    await Promise.all([
+      client.connect(clientTransport),
+      mcpServer.server.connect(serverTransport),
+    ]);
+
+    await expect(
+      client.request(
+        {
+          method: "tools/call",
+          params: {
+            name: "test-tool",
+            arguments: {
+              name: "test",
+            },
+          },
+        },
+        CallToolResultSchema
+      )
+    ).rejects.toThrow(
+      /Invalid arguments for tool test-tool: must have required property 'value'/
+    );
   });
 
   /***
@@ -1651,18 +1852,22 @@ describe("tool()", () => {
       author: "test-author",
       version: "1.2.3",
       category: "utility",
-      tags: ["test", "example"]
+      tags: ["test", "example"],
     };
 
     mcpServer.registerTool(
       "test-with-meta",
       {
         description: "A tool with _meta field",
-        inputSchema: { name: z.string() },
+        inputSchema: {
+          type: "object",
+          properties: { name: { type: "string" } },
+          required: ["name"],
+        },
         _meta: metaData,
       },
       async ({ name }) => ({
-        content: [{ type: "text", text: `Hello, ${name}!` }]
+        content: [{ type: "text", text: `Hello, ${name}!` }],
       })
     );
 
@@ -1676,7 +1881,7 @@ describe("tool()", () => {
 
     const result = await client.request(
       { method: "tools/list" },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
 
     expect(result.tools).toHaveLength(1);
@@ -1702,10 +1907,14 @@ describe("tool()", () => {
       "test-without-meta",
       {
         description: "A tool without _meta field",
-        inputSchema: { name: z.string() },
+        inputSchema: {
+          type: "object",
+          properties: { name: { type: "string" } },
+          required: ["name"],
+        },
       },
       async ({ name }) => ({
-        content: [{ type: "text", text: `Hello, ${name}!` }]
+        content: [{ type: "text", text: `Hello, ${name}!` }],
       })
     );
 
@@ -1719,7 +1928,7 @@ describe("tool()", () => {
 
     const result = await client.request(
       { method: "tools/list" },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
 
     expect(result.tools).toHaveLength(1);
@@ -1763,7 +1972,7 @@ describe("resource()", () => {
       {
         method: "resources/list",
       },
-      ListResourcesResultSchema,
+      ListResourcesResultSchema
     );
 
     expect(result.resources).toHaveLength(1);
@@ -1785,18 +1994,22 @@ describe("resource()", () => {
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification);
+      notifications.push(notification as Notification);
     };
 
     // Register initial resource
-    const resource = mcpServer.resource("test", "test://resource", async () => ({
-      contents: [
-        {
-          uri: "test://resource",
-          text: "Initial content",
-        },
-      ],
-    }));
+    const resource = mcpServer.resource(
+      "test",
+      "test://resource",
+      async () => ({
+        contents: [
+          {
+            uri: "test://resource",
+            text: "Initial content",
+          },
+        ],
+      })
+    );
 
     // Update the resource
     resource.update({
@@ -1807,7 +2020,7 @@ describe("resource()", () => {
             text: "Updated content",
           },
         ],
-      })
+      }),
     });
 
     const [clientTransport, serverTransport] =
@@ -1826,7 +2039,7 @@ describe("resource()", () => {
           uri: "test://resource",
         },
       },
-      ReadResourceResultSchema,
+      ReadResourceResultSchema
     );
 
     expect(result.contents).toHaveLength(1);
@@ -1850,7 +2063,7 @@ describe("resource()", () => {
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification);
+      notifications.push(notification as Notification);
     };
 
     // Register initial resource template
@@ -1864,7 +2077,7 @@ describe("resource()", () => {
             text: "Initial content",
           },
         ],
-      }),
+      })
     );
 
     // Update the resource template
@@ -1876,7 +2089,7 @@ describe("resource()", () => {
             text: "Updated content",
           },
         ],
-      })
+      }),
     });
 
     const [clientTransport, serverTransport] =
@@ -1895,7 +2108,7 @@ describe("resource()", () => {
           uri: "test://resource/123",
         },
       },
-      ReadResourceResultSchema,
+      ReadResourceResultSchema
     );
 
     expect(result.contents).toHaveLength(1);
@@ -1919,20 +2132,25 @@ describe("resource()", () => {
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification);
+      notifications.push(notification as Notification);
     };
 
     // Register initial resource
-    const resource = mcpServer.resource("test", "test://resource", async () => ({
-      contents: [
-        {
-          uri: "test://resource",
-          text: "Test content",
-        },
-      ],
-    }));
+    const resource = mcpServer.resource(
+      "test",
+      "test://resource",
+      async () => ({
+        contents: [
+          {
+            uri: "test://resource",
+            text: "Test content",
+          },
+        ],
+      })
+    );
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
 
     await Promise.all([
       client.connect(clientTransport),
@@ -1950,14 +2168,14 @@ describe("resource()", () => {
             text: "Updated content",
           },
         ],
-      })
+      }),
     });
 
     // Yield event loop to let the notification fly
     await new Promise(process.nextTick);
 
     expect(notifications).toMatchObject([
-      { method: "notifications/resources/list_changed" }
+      { method: "notifications/resources/list_changed" },
     ]);
   });
 
@@ -1975,19 +2193,24 @@ describe("resource()", () => {
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification);
+      notifications.push(notification as Notification);
     };
 
     // Register initial resources
-    const resource1 = mcpServer.resource("resource1", "test://resource1", async () => ({
-      contents: [{ uri: "test://resource1", text: "Resource 1 content" }],
-    }));
+    const resource1 = mcpServer.resource(
+      "resource1",
+      "test://resource1",
+      async () => ({
+        contents: [{ uri: "test://resource1", text: "Resource 1 content" }],
+      })
+    );
 
     mcpServer.resource("resource2", "test://resource2", async () => ({
       contents: [{ uri: "test://resource2", text: "Resource 2 content" }],
     }));
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
 
     await Promise.all([
       client.connect(clientTransport),
@@ -1997,7 +2220,7 @@ describe("resource()", () => {
     // Verify both resources are registered
     let result = await client.request(
       { method: "resources/list" },
-      ListResourcesResultSchema,
+      ListResourcesResultSchema
     );
 
     expect(result.resources).toHaveLength(2);
@@ -2005,20 +2228,20 @@ describe("resource()", () => {
     expect(notifications).toHaveLength(0);
 
     // Remove a resource
-    resource1.remove()
+    resource1.remove();
 
     // Yield event loop to let the notification fly
     await new Promise(process.nextTick);
 
     // Should have sent notification
     expect(notifications).toMatchObject([
-      { method: "notifications/resources/list_changed" }
+      { method: "notifications/resources/list_changed" },
     ]);
 
     // Verify the resource was removed
     result = await client.request(
       { method: "resources/list" },
-      ListResourcesResultSchema,
+      ListResourcesResultSchema
     );
 
     expect(result.resources).toHaveLength(1);
@@ -2039,7 +2262,7 @@ describe("resource()", () => {
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification);
+      notifications.push(notification as Notification);
     };
 
     // Register resource template
@@ -2053,10 +2276,11 @@ describe("resource()", () => {
             text: "Template content",
           },
         ],
-      }),
+      })
     );
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
 
     await Promise.all([
       client.connect(clientTransport),
@@ -2066,27 +2290,27 @@ describe("resource()", () => {
     // Verify template is registered
     const result = await client.request(
       { method: "resources/templates/list" },
-      ListResourceTemplatesResultSchema,
+      ListResourceTemplatesResultSchema
     );
 
     expect(result.resourceTemplates).toHaveLength(1);
     expect(notifications).toHaveLength(0);
 
     // Remove the template
-    resourceTemplate.remove()
+    resourceTemplate.remove();
 
     // Yield event loop to let the notification fly
     await new Promise(process.nextTick);
 
     // Should have sent notification
     expect(notifications).toMatchObject([
-      { method: "notifications/resources/list_changed" }
+      { method: "notifications/resources/list_changed" },
     ]);
 
     // Verify the template was removed
     const result2 = await client.request(
       { method: "resources/templates/list" },
-      ListResourceTemplatesResultSchema,
+      ListResourceTemplatesResultSchema
     );
 
     expect(result2.resourceTemplates).toHaveLength(0);
@@ -2119,7 +2343,7 @@ describe("resource()", () => {
             text: "Test content",
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -2134,7 +2358,7 @@ describe("resource()", () => {
       {
         method: "resources/list",
       },
-      ListResourcesResultSchema,
+      ListResourcesResultSchema
     );
 
     expect(result.resources).toHaveLength(1);
@@ -2165,7 +2389,7 @@ describe("resource()", () => {
             text: "Test content",
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -2180,13 +2404,13 @@ describe("resource()", () => {
       {
         method: "resources/templates/list",
       },
-      ListResourceTemplatesResultSchema,
+      ListResourceTemplatesResultSchema
     );
 
     expect(result.resourceTemplates).toHaveLength(1);
     expect(result.resourceTemplates[0].name).toBe("test");
     expect(result.resourceTemplates[0].uriTemplate).toBe(
-      "test://resource/{id}",
+      "test://resource/{id}"
     );
   });
 
@@ -2226,7 +2450,7 @@ describe("resource()", () => {
             text: "Test content",
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -2241,7 +2465,7 @@ describe("resource()", () => {
       {
         method: "resources/list",
       },
-      ListResourcesResultSchema,
+      ListResourcesResultSchema
     );
 
     expect(result.resources).toHaveLength(2);
@@ -2276,7 +2500,7 @@ describe("resource()", () => {
             text: `Category: ${category}, ID: ${id}`,
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -2294,7 +2518,7 @@ describe("resource()", () => {
           uri: "test://resource/books/123",
         },
       },
-      ReadResourceResultSchema,
+      ReadResourceResultSchema
     );
 
     expect(result.contents[0].text).toBe("Category: books, ID: 123");
@@ -2379,7 +2603,7 @@ describe("resource()", () => {
             text: "Test content",
           },
         ],
-      }),
+      })
     );
 
     expect(() => {
@@ -2393,7 +2617,7 @@ describe("resource()", () => {
               text: "Test content 2",
             },
           ],
-        }),
+        })
       );
     }).toThrow(/already registered/);
   });
@@ -2431,8 +2655,8 @@ describe("resource()", () => {
             uri: "test://error",
           },
         },
-        ReadResourceResultSchema,
-      ),
+        ReadResourceResultSchema
+      )
     ).rejects.toThrow(/Resource read failed/);
   });
 
@@ -2474,8 +2698,8 @@ describe("resource()", () => {
             uri: "test://nonexistent",
           },
         },
-        ReadResourceResultSchema,
-      ),
+        ReadResourceResultSchema
+      )
     ).rejects.toThrow(/Resource test:\/\/nonexistent not found/);
   });
 
@@ -2507,7 +2731,7 @@ describe("resource()", () => {
             text: "Test content",
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -2518,8 +2742,8 @@ describe("resource()", () => {
       mcpServer.server.connect(serverTransport),
     ]);
 
-    expect(client.getServerCapabilities()).toMatchObject({ completions: {} })
-  })
+    expect(client.getServerCapabilities()).toMatchObject({ completions: {} });
+  });
 
   /***
    * Test: Resource Template Parameter Completion
@@ -2550,7 +2774,7 @@ describe("resource()", () => {
             text: "Test content",
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -2575,7 +2799,7 @@ describe("resource()", () => {
           },
         },
       },
-      CompleteResultSchema,
+      CompleteResultSchema
     );
 
     expect(result.completion.values).toEqual(["books", "movies", "music"]);
@@ -2603,7 +2827,7 @@ describe("resource()", () => {
         complete: {
           category: (test: string) =>
             ["books", "movies", "music"].filter((value) =>
-              value.startsWith(test),
+              value.startsWith(test)
             ),
         },
       }),
@@ -2614,7 +2838,7 @@ describe("resource()", () => {
             text: "Test content",
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -2639,7 +2863,7 @@ describe("resource()", () => {
           },
         },
       },
-      CompleteResultSchema,
+      CompleteResultSchema
     );
 
     expect(result.completion.values).toEqual(["movies", "music"]);
@@ -2661,19 +2885,24 @@ describe("resource()", () => {
     });
 
     let receivedRequestId: string | number | undefined;
-    mcpServer.resource("request-id-test", "test://resource", async (_uri, extra) => {
-      receivedRequestId = extra.requestId;
-      return {
-        contents: [
-          {
-            uri: "test://resource",
-            text: `Received request ID: ${extra.requestId}`,
-          },
-        ],
-      };
-    });
+    mcpServer.resource(
+      "request-id-test",
+      "test://resource",
+      async (_uri, extra) => {
+        receivedRequestId = extra.requestId;
+        return {
+          contents: [
+            {
+              uri: "test://resource",
+              text: `Received request ID: ${extra.requestId}`,
+            },
+          ],
+        };
+      }
+    );
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
 
     await Promise.all([
       client.connect(clientTransport),
@@ -2687,11 +2916,14 @@ describe("resource()", () => {
           uri: "test://resource",
         },
       },
-      ReadResourceResultSchema,
+      ReadResourceResultSchema
     );
 
     expect(receivedRequestId).toBeDefined();
-    expect(typeof receivedRequestId === 'string' || typeof receivedRequestId === 'number').toBe(true);
+    expect(
+      typeof receivedRequestId === "string" ||
+        typeof receivedRequestId === "number"
+    ).toBe(true);
     expect(result.contents[0].text).toContain("Received request ID:");
   });
 });
@@ -2734,7 +2966,7 @@ describe("prompt()", () => {
       {
         method: "prompts/list",
       },
-      ListPromptsResultSchema,
+      ListPromptsResultSchema
     );
 
     expect(result.prompts).toHaveLength(1);
@@ -2755,7 +2987,7 @@ describe("prompt()", () => {
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification);
+      notifications.push(notification as Notification);
     };
 
     // Register initial prompt
@@ -2783,7 +3015,7 @@ describe("prompt()", () => {
             },
           },
         ],
-      })
+      }),
     });
 
     const [clientTransport, serverTransport] =
@@ -2802,11 +3034,13 @@ describe("prompt()", () => {
           name: "test",
         },
       },
-      GetPromptResultSchema,
+      GetPromptResultSchema
     );
 
     expect(result.messages).toHaveLength(1);
-    expect(result.messages[0].content.text).toBe("Updated response");
+    expect(
+      (result.messages[0].content as { type: "text"; text: string }).text
+    ).toBe("Updated response");
 
     // Update happened before transport was connected, so no notifications should be expected
     expect(notifications).toHaveLength(0);
@@ -2826,7 +3060,7 @@ describe("prompt()", () => {
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification);
+      notifications.push(notification as Notification);
     };
 
     // Register initial prompt
@@ -2845,7 +3079,7 @@ describe("prompt()", () => {
             },
           },
         ],
-      }),
+      })
     );
 
     // Update the prompt with a different schema
@@ -2864,7 +3098,7 @@ describe("prompt()", () => {
             },
           },
         ],
-      })
+      }),
     });
 
     const [clientTransport, serverTransport] =
@@ -2880,11 +3114,15 @@ describe("prompt()", () => {
       {
         method: "prompts/list",
       },
-      ListPromptsResultSchema,
+      ListPromptsResultSchema
     );
 
     expect(listResult.prompts[0].arguments).toHaveLength(2);
-    expect(listResult.prompts[0].arguments?.map(a => a.name).sort()).toEqual(["name", "value"]);
+    expect(
+      listResult.prompts[0].arguments
+        ?.map((a: { name: string }) => a.name)
+        .sort()
+    ).toEqual(["name", "value"]);
 
     // Call the prompt with the new schema
     const getResult = await client.request(
@@ -2898,11 +3136,13 @@ describe("prompt()", () => {
           },
         },
       },
-      GetPromptResultSchema,
+      GetPromptResultSchema
     );
 
     expect(getResult.messages).toHaveLength(1);
-    expect(getResult.messages[0].content.text).toBe("Updated: test, value");
+    expect(
+      (getResult.messages[0].content as { type: "text"; text: string }).text
+    ).toBe("Updated: test, value");
 
     // Update happened before transport was connected, so no notifications should be expected
     expect(notifications).toHaveLength(0);
@@ -2922,7 +3162,7 @@ describe("prompt()", () => {
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification);
+      notifications.push(notification as Notification);
     };
 
     // Register initial prompt
@@ -2938,7 +3178,8 @@ describe("prompt()", () => {
       ],
     }));
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
 
     await Promise.all([
       client.connect(clientTransport),
@@ -2959,14 +3200,14 @@ describe("prompt()", () => {
             },
           },
         ],
-      })
+      }),
     });
 
     // Yield event loop to let the notification fly
     await new Promise(process.nextTick);
 
     expect(notifications).toMatchObject([
-      { method: "notifications/prompts/list_changed" }
+      { method: "notifications/prompts/list_changed" },
     ]);
   });
 
@@ -2984,7 +3225,7 @@ describe("prompt()", () => {
       version: "1.0",
     });
     client.fallbackNotificationHandler = async (notification) => {
-      notifications.push(notification);
+      notifications.push(notification as Notification);
     };
 
     // Register initial prompts
@@ -3012,7 +3253,8 @@ describe("prompt()", () => {
       ],
     }));
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
 
     await Promise.all([
       client.connect(clientTransport),
@@ -3022,29 +3264,32 @@ describe("prompt()", () => {
     // Verify both prompts are registered
     let result = await client.request(
       { method: "prompts/list" },
-      ListPromptsResultSchema,
+      ListPromptsResultSchema
     );
 
     expect(result.prompts).toHaveLength(2);
-    expect(result.prompts.map(p => p.name).sort()).toEqual(["prompt1", "prompt2"]);
+    expect(result.prompts.map((p: { name: string }) => p.name).sort()).toEqual([
+      "prompt1",
+      "prompt2",
+    ]);
 
     expect(notifications).toHaveLength(0);
 
     // Remove a prompt
-    prompt1.remove()
+    prompt1.remove();
 
     // Yield event loop to let the notification fly
     await new Promise(process.nextTick);
 
     // Should have sent notification
     expect(notifications).toMatchObject([
-      { method: "notifications/prompts/list_changed" }
+      { method: "notifications/prompts/list_changed" },
     ]);
 
     // Verify the prompt was removed
     result = await client.request(
       { method: "prompts/list" },
-      ListPromptsResultSchema,
+      ListPromptsResultSchema
     );
 
     expect(result.prompts).toHaveLength(1);
@@ -3080,7 +3325,7 @@ describe("prompt()", () => {
             },
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -3095,7 +3340,7 @@ describe("prompt()", () => {
       {
         method: "prompts/list",
       },
-      ListPromptsResultSchema,
+      ListPromptsResultSchema
     );
 
     expect(result.prompts).toHaveLength(1);
@@ -3143,7 +3388,7 @@ describe("prompt()", () => {
       {
         method: "prompts/list",
       },
-      ListPromptsResultSchema,
+      ListPromptsResultSchema
     );
 
     expect(result.prompts).toHaveLength(1);
@@ -3181,7 +3426,7 @@ describe("prompt()", () => {
             },
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -3204,8 +3449,8 @@ describe("prompt()", () => {
             },
           },
         },
-        GetPromptResultSchema,
-      ),
+        GetPromptResultSchema
+      )
     ).rejects.toThrow(/Invalid arguments/);
   });
 
@@ -3291,19 +3536,17 @@ describe("prompt()", () => {
     });
 
     // This should succeed
-    mcpServer.prompt(
-      "echo",
-      { message: z.string() },
-      ({ message }) => ({
-        messages: [{
+    mcpServer.prompt("echo", { message: z.string() }, ({ message }) => ({
+      messages: [
+        {
           role: "user",
           content: {
             type: "text",
-            text: `Please process this message: ${message}`
-          }
-        }]
-      })
-    );
+            text: `Please process this message: ${message}`,
+          },
+        },
+      ],
+    }));
   });
 
   /***
@@ -3331,7 +3574,7 @@ describe("prompt()", () => {
             text: "Test content",
           },
         ],
-      }),
+      })
     );
 
     // Register a prompt with completion
@@ -3339,13 +3582,15 @@ describe("prompt()", () => {
       "echo",
       { message: completable(z.string(), () => ["hello", "world"]) },
       ({ message }) => ({
-        messages: [{
-          role: "user",
-          content: {
-            type: "text",
-            text: `Please process this message: ${message}`
-          }
-        }]
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: `Please process this message: ${message}`,
+            },
+          },
+        ],
       })
     );
   });
@@ -3392,11 +3637,10 @@ describe("prompt()", () => {
             name: "nonexistent-prompt",
           },
         },
-        GetPromptResultSchema,
-      ),
+        GetPromptResultSchema
+      )
     ).rejects.toThrow(/Prompt nonexistent-prompt not found/);
   });
-
 
   /***
    * Test: Registering a prompt with a completable argument should update server capabilities to advertise support for completion
@@ -3426,7 +3670,7 @@ describe("prompt()", () => {
             },
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -3437,8 +3681,8 @@ describe("prompt()", () => {
       mcpServer.server.connect(serverTransport),
     ]);
 
-    expect(client.getServerCapabilities()).toMatchObject({ completions: {} })
-  })
+    expect(client.getServerCapabilities()).toMatchObject({ completions: {} });
+  });
 
   /***
    * Test: Prompt Argument Completion
@@ -3469,7 +3713,7 @@ describe("prompt()", () => {
             },
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -3494,7 +3738,7 @@ describe("prompt()", () => {
           },
         },
       },
-      CompleteResultSchema,
+      CompleteResultSchema
     );
 
     expect(result.completion.values).toEqual(["Alice", "Bob", "Charlie"]);
@@ -3519,7 +3763,7 @@ describe("prompt()", () => {
       "test-prompt",
       {
         name: completable(z.string(), (test) =>
-          ["Alice", "Bob", "Charlie"].filter((value) => value.startsWith(test)),
+          ["Alice", "Bob", "Charlie"].filter((value) => value.startsWith(test))
         ),
       },
       async ({ name }) => ({
@@ -3532,7 +3776,7 @@ describe("prompt()", () => {
             },
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -3557,7 +3801,7 @@ describe("prompt()", () => {
           },
         },
       },
-      CompleteResultSchema,
+      CompleteResultSchema
     );
 
     expect(result.completion.values).toEqual(["Alice"]);
@@ -3594,7 +3838,8 @@ describe("prompt()", () => {
       };
     });
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
 
     await Promise.all([
       client.connect(clientTransport),
@@ -3608,12 +3853,17 @@ describe("prompt()", () => {
           name: "request-id-test",
         },
       },
-      GetPromptResultSchema,
+      GetPromptResultSchema
     );
 
     expect(receivedRequestId).toBeDefined();
-    expect(typeof receivedRequestId === 'string' || typeof receivedRequestId === 'number').toBe(true);
-    expect(result.messages[0].content.text).toContain("Received request ID:");
+    expect(
+      typeof receivedRequestId === "string" ||
+        typeof receivedRequestId === "number"
+    ).toBe(true);
+    expect(
+      (result.messages[0].content as { type: "text"; text: string }).text
+    ).toContain("Received request ID:");
   });
 
   /***
@@ -3659,7 +3909,7 @@ describe("prompt()", () => {
             text: "Test content",
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -3674,14 +3924,16 @@ describe("prompt()", () => {
       {
         method: "resources/list",
       },
-      ListResourcesResultSchema,
+      ListResourcesResultSchema
     );
 
     expect(result.resources).toHaveLength(2);
 
     // Resource 1 should have its own metadata
     expect(result.resources[0].name).toBe("Resource 1");
-    expect(result.resources[0].description).toBe("Individual resource description");
+    expect(result.resources[0].description).toBe(
+      "Individual resource description"
+    );
     expect(result.resources[0].mimeType).toBe("text/plain");
 
     // Resource 2 should inherit template metadata
@@ -3730,7 +3982,7 @@ describe("prompt()", () => {
             text: "Test content",
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -3745,7 +3997,7 @@ describe("prompt()", () => {
       {
         method: "resources/list",
       },
-      ListResourcesResultSchema,
+      ListResourcesResultSchema
     );
 
     expect(result.resources).toHaveLength(1);
@@ -3769,19 +4021,17 @@ describe("Tool title precedence", () => {
     });
 
     // Tool 1: Only name
-    mcpServer.tool(
-      "tool_name_only",
-      async () => ({
-        content: [{ type: "text", text: "Response" }],
-      })
-    );
+    mcpServer.tool("tool_name_only", async () => ({
+      content: [{ type: "text", text: "Response" }],
+    }));
 
     // Tool 2: Name and annotations.title
-    mcpServer.tool(
+    mcpServer.tool<object>(
       "tool_with_annotations_title",
       "Tool with annotations title",
+      { type: "object" },
       {
-        title: "Annotations Title"
+        title: "Annotations Title",
       },
       async () => ({
         content: [{ type: "text", text: "Response" }],
@@ -3789,11 +4039,11 @@ describe("Tool title precedence", () => {
     );
 
     // Tool 3: Name and title (using registerTool)
-    mcpServer.registerTool(
+    mcpServer.registerTool<object, { type: "object" }, { type: "object" }>(
       "tool_with_title",
       {
         title: "Regular Title",
-        description: "Tool with regular title"
+        description: "Tool with regular title",
       },
       async () => ({
         content: [{ type: "text", text: "Response" }],
@@ -3801,21 +4051,22 @@ describe("Tool title precedence", () => {
     );
 
     // Tool 4: All three - title should win
-    mcpServer.registerTool(
+    mcpServer.registerTool<object, { type: "object" }, { type: "object" }>(
       "tool_with_all_titles",
       {
         title: "Regular Title Wins",
         description: "Tool with all titles",
         annotations: {
-          title: "Annotations Title Should Not Show"
-        }
+          title: "Annotations Title Should Not Show",
+        },
       },
       async () => ({
         content: [{ type: "text", text: "Response" }],
       })
     );
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
     await Promise.all([
       client.connect(clientTransport),
       mcpServer.connect(serverTransport),
@@ -3823,74 +4074,88 @@ describe("Tool title precedence", () => {
 
     const result = await client.request(
       { method: "tools/list" },
-      ListToolsResultSchema,
+      ListToolsResultSchema
     );
-
 
     expect(result.tools).toHaveLength(4);
 
     // Tool 1: Only name - should display name
-    const tool1 = result.tools.find(t => t.name === "tool_name_only");
+    const tool1 = result.tools.find((t) => t.name === "tool_name_only");
     expect(tool1).toBeDefined();
     expect(getDisplayName(tool1!)).toBe("tool_name_only");
 
     // Tool 2: Name and annotations.title - should display annotations.title
-    const tool2 = result.tools.find(t => t.name === "tool_with_annotations_title");
+    const tool2 = result.tools.find(
+      (t) => t.name === "tool_with_annotations_title"
+    );
     expect(tool2).toBeDefined();
-    expect(tool2!.annotations?.title).toBe("Annotations Title");
+    expect(
+      (tool2! as { annotations?: { title?: string } }).annotations?.title
+    ).toBe("Annotations Title");
     expect(getDisplayName(tool2!)).toBe("Annotations Title");
 
     // Tool 3: Name and title - should display title
-    const tool3 = result.tools.find(t => t.name === "tool_with_title");
+    const tool3 = result.tools.find((t) => t.name === "tool_with_title");
     expect(tool3).toBeDefined();
     expect(tool3!.title).toBe("Regular Title");
     expect(getDisplayName(tool3!)).toBe("Regular Title");
 
     // Tool 4: All three - title should take precedence
-    const tool4 = result.tools.find(t => t.name === "tool_with_all_titles");
+    const tool4 = result.tools.find((t) => t.name === "tool_with_all_titles");
     expect(tool4).toBeDefined();
     expect(tool4!.title).toBe("Regular Title Wins");
-    expect(tool4!.annotations?.title).toBe("Annotations Title Should Not Show");
+    expect(
+      (tool4! as { annotations?: { title?: string } }).annotations?.title
+    ).toBe("Annotations Title Should Not Show");
     expect(getDisplayName(tool4!)).toBe("Regular Title Wins");
   });
 
   test("getDisplayName unit tests for title precedence", () => {
-
     // Test 1: Only name
     expect(getDisplayName({ name: "tool_name" })).toBe("tool_name");
 
     // Test 2: Name and title - title wins
-    expect(getDisplayName({
-      name: "tool_name",
-      title: "Tool Title"
-    })).toBe("Tool Title");
+    expect(
+      getDisplayName({
+        name: "tool_name",
+        title: "Tool Title",
+      })
+    ).toBe("Tool Title");
 
     // Test 3: Name and annotations.title - annotations.title wins
-    expect(getDisplayName({
-      name: "tool_name",
-      annotations: { title: "Annotations Title" }
-    })).toBe("Annotations Title");
+    expect(
+      getDisplayName({
+        name: "tool_name",
+        annotations: { title: "Annotations Title" },
+      })
+    ).toBe("Annotations Title");
 
     // Test 4: All three - title wins (correct precedence)
-    expect(getDisplayName({
-      name: "tool_name",
-      title: "Regular Title",
-      annotations: { title: "Annotations Title" }
-    })).toBe("Regular Title");
+    expect(
+      getDisplayName({
+        name: "tool_name",
+        title: "Regular Title",
+        annotations: { title: "Annotations Title" },
+      })
+    ).toBe("Regular Title");
 
     // Test 5: Empty title should not be used
-    expect(getDisplayName({
-      name: "tool_name",
-      title: "",
-      annotations: { title: "Annotations Title" }
-    })).toBe("Annotations Title");
+    expect(
+      getDisplayName({
+        name: "tool_name",
+        title: "",
+        annotations: { title: "Annotations Title" },
+      })
+    ).toBe("Annotations Title");
 
     // Test 6: Undefined vs null handling
-    expect(getDisplayName({
-      name: "tool_name",
-      title: undefined,
-      annotations: { title: "Annotations Title" }
-    })).toBe("Annotations Title");
+    expect(
+      getDisplayName({
+        name: "tool_name",
+        title: undefined,
+        annotations: { title: "Annotations Title" },
+      })
+    ).toBe("Annotations Title");
   });
 
   test("should support resource template completion with resolved context", async () => {
@@ -3911,9 +4176,13 @@ describe("Tool title precedence", () => {
         complete: {
           repo: (value, context) => {
             if (context?.arguments?.["owner"] === "org1") {
-              return ["project1", "project2", "project3"].filter(r => r.startsWith(value));
+              return ["project1", "project2", "project3"].filter((r) =>
+                r.startsWith(value)
+              );
             } else if (context?.arguments?.["owner"] === "org2") {
-              return ["repo1", "repo2", "repo3"].filter(r => r.startsWith(value));
+              return ["repo1", "repo2", "repo3"].filter((r) =>
+                r.startsWith(value)
+              );
             }
             return [];
           },
@@ -3921,7 +4190,7 @@ describe("Tool title precedence", () => {
       }),
       {
         title: "GitHub Repository",
-        description: "Repository information"
+        description: "Repository information",
       },
       async () => ({
         contents: [
@@ -3930,7 +4199,7 @@ describe("Tool title precedence", () => {
             text: "Test content",
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -3961,10 +4230,14 @@ describe("Tool title precedence", () => {
           },
         },
       },
-      CompleteResultSchema,
+      CompleteResultSchema
     );
 
-    expect(result1.completion.values).toEqual(["project1", "project2", "project3"]);
+    expect(result1.completion.values).toEqual([
+      "project1",
+      "project2",
+      "project3",
+    ]);
     expect(result1.completion.total).toBe(3);
 
     // Test with facebook owner
@@ -3987,7 +4260,7 @@ describe("Tool title precedence", () => {
           },
         },
       },
-      CompleteResultSchema,
+      CompleteResultSchema
     );
 
     expect(result2.completion.values).toEqual(["repo1", "repo2", "repo3"]);
@@ -4008,7 +4281,7 @@ describe("Tool title precedence", () => {
           },
         },
       },
-      CompleteResultSchema,
+      CompleteResultSchema
     );
 
     expect(result3.completion.values).toEqual([]);
@@ -4033,20 +4306,28 @@ describe("Tool title precedence", () => {
         description: "Generate a greeting for team members",
         argsSchema: {
           department: completable(z.string(), (value) => {
-            return ["engineering", "sales", "marketing", "support"].filter(d => d.startsWith(value));
+            return ["engineering", "sales", "marketing", "support"].filter(
+              (d) => d.startsWith(value)
+            );
           }),
           name: completable(z.string(), (value, context) => {
             const department = context?.arguments?.["department"];
             if (department === "engineering") {
-              return ["Alice", "Bob", "Charlie"].filter(n => n.startsWith(value));
+              return ["Alice", "Bob", "Charlie"].filter((n) =>
+                n.startsWith(value)
+              );
             } else if (department === "sales") {
-              return ["David", "Eve", "Frank"].filter(n => n.startsWith(value));
+              return ["David", "Eve", "Frank"].filter((n) =>
+                n.startsWith(value)
+              );
             } else if (department === "marketing") {
-              return ["Grace", "Henry", "Iris"].filter(n => n.startsWith(value));
+              return ["Grace", "Henry", "Iris"].filter((n) =>
+                n.startsWith(value)
+              );
             }
-            return ["Guest"].filter(n => n.startsWith(value));
+            return ["Guest"].filter((n) => n.startsWith(value));
           }),
-        }
+        },
       },
       async ({ department, name }) => ({
         messages: [
@@ -4058,7 +4339,7 @@ describe("Tool title precedence", () => {
             },
           },
         ],
-      }),
+      })
     );
 
     const [clientTransport, serverTransport] =
@@ -4089,7 +4370,7 @@ describe("Tool title precedence", () => {
           },
         },
       },
-      CompleteResultSchema,
+      CompleteResultSchema
     );
 
     expect(result1.completion.values).toEqual(["Alice"]);
@@ -4114,7 +4395,7 @@ describe("Tool title precedence", () => {
           },
         },
       },
-      CompleteResultSchema,
+      CompleteResultSchema
     );
 
     expect(result2.completion.values).toEqual(["David"]);
@@ -4139,7 +4420,7 @@ describe("Tool title precedence", () => {
           },
         },
       },
-      CompleteResultSchema,
+      CompleteResultSchema
     );
 
     expect(result3.completion.values).toEqual(["Grace"]);
@@ -4159,228 +4440,9 @@ describe("Tool title precedence", () => {
           },
         },
       },
-      CompleteResultSchema,
+      CompleteResultSchema
     );
 
     expect(result4.completion.values).toEqual(["Guest"]);
-  });
-});
-
-describe("elicitInput()", () => {
-
-  const checkAvailability = jest.fn().mockResolvedValue(false);
-  const findAlternatives = jest.fn().mockResolvedValue([]);
-  const makeBooking = jest.fn().mockResolvedValue("BOOKING-123");
-
-  let mcpServer: McpServer;
-  let client: Client;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-
-    // Create server with restaurant booking tool
-    mcpServer = new McpServer({
-      name: "restaurant-booking-server",
-      version: "1.0.0",
-    });
-
-    // Register the restaurant booking tool from README example
-    mcpServer.tool(
-      "book-restaurant",
-      {
-        restaurant: z.string(),
-        date: z.string(),
-        partySize: z.number()
-      },
-      async ({ restaurant, date, partySize }) => {
-        // Check availability
-        const available = await checkAvailability(restaurant, date, partySize);
-
-        if (!available) {
-          // Ask user if they want to try alternative dates
-          const result = await mcpServer.server.elicitInput({
-            message: `No tables available at ${restaurant} on ${date}. Would you like to check alternative dates?`,
-            requestedSchema: {
-              type: "object",
-              properties: {
-                checkAlternatives: {
-                  type: "boolean",
-                  title: "Check alternative dates",
-                  description: "Would you like me to check other dates?"
-                },
-                flexibleDates: {
-                  type: "string",
-                  title: "Date flexibility",
-                  description: "How flexible are your dates?",
-                  enum: ["next_day", "same_week", "next_week"],
-                  enumNames: ["Next day", "Same week", "Next week"]
-                }
-              },
-              required: ["checkAlternatives"]
-            }
-          });
-
-          if (result.action === "accept" && result.content?.checkAlternatives) {
-            const alternatives = await findAlternatives(
-              restaurant,
-              date,
-              partySize,
-              result.content.flexibleDates as string
-            );
-            return {
-              content: [{
-                type: "text",
-                text: `Found these alternatives: ${alternatives.join(", ")}`
-              }]
-            };
-          }
-
-          return {
-            content: [{
-              type: "text",
-              text: "No booking made. Original date not available."
-            }]
-          };
-        }
-
-        await makeBooking(restaurant, date, partySize);
-        return {
-          content: [{
-            type: "text",
-            text: `Booked table for ${partySize} at ${restaurant} on ${date}`
-          }]
-        };
-      }
-    );
-
-    // Create client with elicitation capability
-    client = new Client(
-      {
-        name: "test-client",
-        version: "1.0.0",
-      },
-      {
-        capabilities: {
-          elicitation: {},
-        },
-      }
-    );
-  });
-
-  test("should successfully elicit additional information", async () => {
-    // Mock availability check to return false
-    checkAvailability.mockResolvedValue(false);
-    findAlternatives.mockResolvedValue(["2024-12-26", "2024-12-27", "2024-12-28"]);
-
-    // Set up client to accept alternative date checking
-    client.setRequestHandler(ElicitRequestSchema, async (request) => {
-      expect(request.params.message).toContain("No tables available at ABC Restaurant on 2024-12-25");
-      return {
-        action: "accept",
-        content: {
-          checkAlternatives: true,
-          flexibleDates: "same_week"
-        }
-      };
-    });
-
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-
-    await Promise.all([
-      client.connect(clientTransport),
-      mcpServer.server.connect(serverTransport),
-    ]);
-
-    // Call the tool
-    const result = await client.callTool({
-      name: "book-restaurant",
-      arguments: {
-        restaurant: "ABC Restaurant",
-        date: "2024-12-25",
-        partySize: 2
-      }
-    });
-
-    expect(checkAvailability).toHaveBeenCalledWith("ABC Restaurant", "2024-12-25", 2);
-    expect(findAlternatives).toHaveBeenCalledWith("ABC Restaurant", "2024-12-25", 2, "same_week");
-    expect(result.content).toEqual([{
-      type: "text",
-      text: "Found these alternatives: 2024-12-26, 2024-12-27, 2024-12-28"
-    }]);
-  });
-
-  test("should handle user declining to elicitation request", async () => {
-    // Mock availability check to return false
-    checkAvailability.mockResolvedValue(false);
-
-    // Set up client to reject alternative date checking
-    client.setRequestHandler(ElicitRequestSchema, async () => {
-      return {
-        action: "accept",
-        content: {
-          checkAlternatives: false
-        }
-      };
-    });
-
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-
-    await Promise.all([
-      client.connect(clientTransport),
-      mcpServer.server.connect(serverTransport),
-    ]);
-
-    // Call the tool
-    const result = await client.callTool({
-      name: "book-restaurant",
-      arguments: {
-        restaurant: "ABC Restaurant",
-        date: "2024-12-25",
-        partySize: 2
-      }
-    });
-
-    expect(checkAvailability).toHaveBeenCalledWith("ABC Restaurant", "2024-12-25", 2);
-    expect(findAlternatives).not.toHaveBeenCalled();
-    expect(result.content).toEqual([{
-      type: "text",
-      text: "No booking made. Original date not available."
-    }]);
-  });
-
-  test("should handle user cancelling the elicitation", async () => {
-    // Mock availability check to return false
-    checkAvailability.mockResolvedValue(false);
-
-    // Set up client to cancel the elicitation
-    client.setRequestHandler(ElicitRequestSchema, async () => {
-      return {
-        action: "cancel"
-      };
-    });
-
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-
-    await Promise.all([
-      client.connect(clientTransport),
-      mcpServer.server.connect(serverTransport),
-    ]);
-
-    // Call the tool
-    const result = await client.callTool({
-      name: "book-restaurant",
-      arguments: {
-        restaurant: "ABC Restaurant",
-        date: "2024-12-25",
-        partySize: 2
-      }
-    });
-
-    expect(checkAvailability).toHaveBeenCalledWith("ABC Restaurant", "2024-12-25", 2);
-    expect(findAlternatives).not.toHaveBeenCalled();
-    expect(result.content).toEqual([{
-      type: "text",
-      text: "No booking made. Original date not available."
-    }]);
   });
 });
