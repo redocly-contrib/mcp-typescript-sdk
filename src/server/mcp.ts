@@ -49,11 +49,6 @@ import { UriTemplate, Variables } from "../shared/uriTemplate.js";
 import { RequestHandlerExtra } from "../shared/protocol.js";
 import { Transport } from "../shared/transport.js";
 import Ajv, { JSONSchemaType, ErrorObject } from "@redocly/ajv";
-// import _Ajv from "@redocly/ajv";
-
-// const Ajv = _Ajv as unknown as typeof _Ajv;
-// import Ajv from '@redocly/ajv';
-// const Ajv = ajvModule.default;
 
 /**
  * High-level MCP server that provides a simpler API for working with resources, tools, and prompts.
