@@ -17,7 +17,7 @@ export type CompleteCallback<T extends ZodTypeAny = ZodTypeAny> = (
   value: T["_input"],
   context?: {
     arguments?: Record<string, string>;
-  },
+  }
 ) => T["_input"][] | Promise<T["_input"][]>;
 
 export interface CompletableDef<T extends ZodTypeAny = ZodTypeAny>
@@ -50,7 +50,7 @@ export class Completable<T extends ZodTypeAny> extends ZodType<
     type: T,
     params: RawCreateParams & {
       complete: CompleteCallback<T>;
-    },
+    }
   ): Completable<T> => {
     return new Completable({
       type,
@@ -66,7 +66,7 @@ export class Completable<T extends ZodTypeAny> extends ZodType<
  */
 export function completable<T extends ZodTypeAny>(
   schema: T,
-  complete: CompleteCallback<T>,
+  complete: CompleteCallback<T>
 ): Completable<T> {
   return Completable.create(schema, { ...schema._def, complete });
 }
@@ -78,7 +78,7 @@ function processCreateParams(params: RawCreateParams): ProcessedCreateParams {
   const { errorMap, invalid_type_error, required_error, description } = params;
   if (errorMap && (invalid_type_error || required_error)) {
     throw new Error(
-      `Can't use "invalid_type_error" or "required_error" in conjunction with custom error map.`,
+      `Can't use "invalid_type_error" or "required_error" in conjunction with custom error map.`
     );
   }
   if (errorMap) return { errorMap: errorMap, description };

@@ -8,9 +8,6 @@ import {
   ClientCapabilities,
   CreateMessageRequest,
   CreateMessageResultSchema,
-  ElicitRequest,
-  ElicitResult,
-  ElicitResultSchema,
   EmptyResultSchema,
   Implementation,
   InitializedNotificationSchema,
@@ -21,8 +18,6 @@ import {
   ListRootsRequest,
   ListRootsResultSchema,
   LoggingMessageNotification,
-  McpError,
-  ErrorCode,
   Notification,
   Request,
   ResourceUpdatedNotification,
@@ -34,9 +29,8 @@ import {
   SUPPORTED_PROTOCOL_VERSIONS,
   LoggingLevel,
   SetLevelRequestSchema,
-  LoggingLevelSchema
+  LoggingLevelSchema,
 } from "../types.js";
-import Ajv from "ajv";
 
 export type ServerOptions = ProtocolOptions & {
   /**
@@ -75,10 +69,11 @@ export type ServerOptions = ProtocolOptions & {
  * })
  * ```
  */
+
 export class Server<
   RequestT extends Request = Request,
   NotificationT extends Notification = Notification,
-  ResultT extends Result = Result,
+  ResultT extends Result = Result
 > extends Protocol<
   ServerRequest | RequestT,
   ServerNotification | NotificationT,
@@ -97,31 +92,31 @@ export class Server<
   /**
    * Initializes this server with the given name and version information.
    */
-  constructor(
-    private _serverInfo: Implementation,
-    options?: ServerOptions,
-  ) {
+  constructor(private _serverInfo: Implementation, options?: ServerOptions) {
     super(options);
     this._capabilities = options?.capabilities ?? {};
     this._instructions = options?.instructions;
 
     this.setRequestHandler(InitializeRequestSchema, (request) =>
-      this._oninitialize(request),
+      this._oninitialize(request as InitializeRequest)
     );
     this.setNotificationHandler(InitializedNotificationSchema, () =>
-      this.oninitialized?.(),
+      this.oninitialized?.()
     );
 
     if (this._capabilities.logging) {
-        this.setRequestHandler(SetLevelRequestSchema, async (request, extra) => {
-            const transportSessionId: string | undefined = extra.sessionId || extra.requestInfo?.headers['mcp-session-id'] as string || undefined;
-            const { level } = request.params;
-            const parseResult = LoggingLevelSchema.safeParse(level);
-            if (parseResult.success) {
-                this._loggingLevels.set(transportSessionId, parseResult.data);
-            }
-            return {};
-        })
+      this.setRequestHandler(SetLevelRequestSchema, async (request, extra) => {
+        const transportSessionId: string | undefined =
+          extra.sessionId ||
+          (extra.requestInfo?.headers["mcp-session-id"] as string) ||
+          undefined;
+        const { level } = request.params;
+        const parseResult = LoggingLevelSchema.safeParse(level);
+        if (parseResult.success) {
+          this._loggingLevels.set(transportSessionId, parseResult.data);
+        }
+        return {};
+      });
     }
   }
 
@@ -134,11 +129,15 @@ export class Server<
   );
 
   // Is a message with the given level ignored in the log level set for the given session id?
-  private isMessageIgnored = (level: LoggingLevel, sessionId?: string): boolean => {
+  private isMessageIgnored = (
+    level: LoggingLevel,
+    sessionId?: string
+  ): boolean => {
     const currentLevel = this._loggingLevels.get(sessionId);
-    return (currentLevel)
-        ? this.LOG_LEVEL_SEVERITY.get(level)! < this.LOG_LEVEL_SEVERITY.get(currentLevel)!
-        : false;
+    return currentLevel
+      ? this.LOG_LEVEL_SEVERITY.get(level)! <
+          this.LOG_LEVEL_SEVERITY.get(currentLevel)!
+      : false;
   };
 
   /**
@@ -149,9 +148,10 @@ export class Server<
   public registerCapabilities(capabilities: ServerCapabilities): void {
     if (this.transport) {
       throw new Error(
-        "Cannot register capabilities after connecting to transport",
+        "Cannot register capabilities after connecting to transport"
       );
     }
+
     this._capabilities = mergeCapabilities(this._capabilities, capabilities);
   }
 
@@ -160,7 +160,7 @@ export class Server<
       case "sampling/createMessage":
         if (!this._clientCapabilities?.sampling) {
           throw new Error(
-            `Client does not support sampling (required for ${method})`,
+            `Client does not support sampling (required for ${method})`
           );
         }
         break;
@@ -168,7 +168,7 @@ export class Server<
       case "elicitation/create":
         if (!this._clientCapabilities?.elicitation) {
           throw new Error(
-            `Client does not support elicitation (required for ${method})`,
+            `Client does not support elicitation (required for ${method})`
           );
         }
         break;
@@ -176,7 +176,7 @@ export class Server<
       case "roots/list":
         if (!this._clientCapabilities?.roots) {
           throw new Error(
-            `Client does not support listing roots (required for ${method})`,
+            `Client does not support listing roots (required for ${method})`
           );
         }
         break;
@@ -188,13 +188,13 @@ export class Server<
   }
 
   protected assertNotificationCapability(
-    method: (ServerNotification | NotificationT)["method"],
+    method: (ServerNotification | NotificationT)["method"]
   ): void {
     switch (method as ServerNotification["method"]) {
       case "notifications/message":
         if (!this._capabilities.logging) {
           throw new Error(
-            `Server does not support logging (required for ${method})`,
+            `Server does not support logging (required for ${method})`
           );
         }
         break;
@@ -203,7 +203,7 @@ export class Server<
       case "notifications/resources/list_changed":
         if (!this._capabilities.resources) {
           throw new Error(
-            `Server does not support notifying about resources (required for ${method})`,
+            `Server does not support notifying about resources (required for ${method})`
           );
         }
         break;
@@ -211,7 +211,7 @@ export class Server<
       case "notifications/tools/list_changed":
         if (!this._capabilities.tools) {
           throw new Error(
-            `Server does not support notifying of tool list changes (required for ${method})`,
+            `Server does not support notifying of tool list changes (required for ${method})`
           );
         }
         break;
@@ -219,7 +219,7 @@ export class Server<
       case "notifications/prompts/list_changed":
         if (!this._capabilities.prompts) {
           throw new Error(
-            `Server does not support notifying of prompt list changes (required for ${method})`,
+            `Server does not support notifying of prompt list changes (required for ${method})`
           );
         }
         break;
@@ -239,7 +239,7 @@ export class Server<
       case "sampling/createMessage":
         if (!this._capabilities.sampling) {
           throw new Error(
-            `Server does not support sampling (required for ${method})`,
+            `Server does not support sampling (required for ${method})`
           );
         }
         break;
@@ -247,7 +247,7 @@ export class Server<
       case "logging/setLevel":
         if (!this._capabilities.logging) {
           throw new Error(
-            `Server does not support logging (required for ${method})`,
+            `Server does not support logging (required for ${method})`
           );
         }
         break;
@@ -256,7 +256,7 @@ export class Server<
       case "prompts/list":
         if (!this._capabilities.prompts) {
           throw new Error(
-            `Server does not support prompts (required for ${method})`,
+            `Server does not support prompts (required for ${method})`
           );
         }
         break;
@@ -266,7 +266,7 @@ export class Server<
       case "resources/read":
         if (!this._capabilities.resources) {
           throw new Error(
-            `Server does not support resources (required for ${method})`,
+            `Server does not support resources (required for ${method})`
           );
         }
         break;
@@ -275,7 +275,7 @@ export class Server<
       case "tools/list":
         if (!this._capabilities.tools) {
           throw new Error(
-            `Server does not support tools (required for ${method})`,
+            `Server does not support tools (required for ${method})`
           );
         }
         break;
@@ -288,16 +288,18 @@ export class Server<
   }
 
   private async _oninitialize(
-    request: InitializeRequest,
+    request: InitializeRequest
   ): Promise<InitializeResult> {
     const requestedVersion = request.params.protocolVersion;
 
     this._clientCapabilities = request.params.capabilities;
     this._clientVersion = request.params.clientInfo;
 
-    const protocolVersion = SUPPORTED_PROTOCOL_VERSIONS.includes(requestedVersion)
-        ? requestedVersion
-        : LATEST_PROTOCOL_VERSION;
+    const protocolVersion = SUPPORTED_PROTOCOL_VERSIONS.includes(
+      requestedVersion
+    )
+      ? requestedVersion
+      : LATEST_PROTOCOL_VERSION;
 
     return {
       protocolVersion,
@@ -331,77 +333,42 @@ export class Server<
 
   async createMessage(
     params: CreateMessageRequest["params"],
-    options?: RequestOptions,
+    options?: RequestOptions
   ) {
     return this.request(
       { method: "sampling/createMessage", params },
       CreateMessageResultSchema,
-      options,
+      options
     );
-  }
-
-  async elicitInput(
-    params: ElicitRequest["params"],
-    options?: RequestOptions,
-  ): Promise<ElicitResult> {
-    const result = await this.request(
-      { method: "elicitation/create", params },
-      ElicitResultSchema,
-      options,
-    );
-
-    // Validate the response content against the requested schema if action is "accept"
-    if (result.action === "accept" && result.content) {
-      try {
-        const ajv = new Ajv();
-
-        const validate = ajv.compile(params.requestedSchema);
-        const isValid = validate(result.content);
-
-        if (!isValid) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            `Elicitation response content does not match requested schema: ${ajv.errorsText(validate.errors)}`,
-          );
-        }
-      } catch (error) {
-        if (error instanceof McpError) {
-          throw error;
-        }
-        throw new McpError(
-          ErrorCode.InternalError,
-          `Error validating elicitation response: ${error}`,
-        );
-      }
-    }
-
-    return result;
   }
 
   async listRoots(
     params?: ListRootsRequest["params"],
-    options?: RequestOptions,
+    options?: RequestOptions
   ) {
     return this.request(
       { method: "roots/list", params },
       ListRootsResultSchema,
-      options,
+      options
     );
   }
 
-    /**
-     * Sends a logging message to the client, if connected.
-     * Note: You only need to send the parameters object, not the entire JSON RPC message
-     * @see LoggingMessageNotification
-     * @param params
-     * @param sessionId optional for stateless and backward compatibility
-     */
-    async sendLoggingMessage(params: LoggingMessageNotification["params"], sessionId?: string) {
-      if (this._capabilities.logging) {
-          if (!this.isMessageIgnored(params.level, sessionId)) {
-              return this.notification({method: "notifications/message", params})
-          }
+  /**
+   * Sends a logging message to the client, if connected.
+   * Note: You only need to send the parameters object, not the entire JSON RPC message
+   * @see LoggingMessageNotification
+   * @param params
+   * @param sessionId optional for stateless and backward compatibility
+   */
+  async sendLoggingMessage(
+    params: LoggingMessageNotification["params"],
+    sessionId?: string
+  ) {
+    if (this._capabilities.logging) {
+      if (!this.isMessageIgnored(params.level, sessionId)) {
+        return this.notification({ method: "notifications/message", params });
       }
+    }
   }
 
   async sendResourceUpdated(params: ResourceUpdatedNotification["params"]) {

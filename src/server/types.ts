@@ -1,6 +1,7 @@
 /**
  * Information about a validated access token, provided to request handlers.
  */
+
 export interface AuthInfo {
   /**
    * The access token.
@@ -31,6 +32,6 @@ export interface AuthInfo {
   /**
    * Additional data associated with the token.
    * This field should be used for any additional data that needs to be attached to the auth info.
-  */
+   */
   extra?: Record<string, unknown>;
 }

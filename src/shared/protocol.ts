@@ -26,7 +26,7 @@ import {
   RequestInfo,
 } from "../types.js";
 import { Transport, TransportSendOptions } from "./transport.js";
-import { AuthInfo } from "../server/auth/types.js";
+import { AuthInfo } from "../server/types.js";
 
 /**
  * Callback for progress notifications.

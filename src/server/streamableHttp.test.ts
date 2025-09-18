@@ -4,8 +4,7 @@ import { randomUUID } from "node:crypto";
 import { EventStore, StreamableHTTPServerTransport, EventId, StreamId } from "./streamableHttp.js";
 import { McpServer } from "./mcp.js";
 import { CallToolResult, JSONRPCMessage } from "../types.js";
-import { z } from "zod";
-import { AuthInfo } from "./auth/types.js";
+import { AuthInfo } from "./types.js";
 
 async function getFreePort() {
   return new Promise(res => {
@@ -47,10 +46,10 @@ async function createTestServer(config: TestServerConfig = { sessionIdGenerator:
     { capabilities: { logging: {} } }
   );
 
-  mcpServer.tool(
+  mcpServer.tool<{ name: string }>(
     "greet",
     "A simple greeting tool",
-    { name: z.string().describe("Name to greet") },
+    { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
     async ({ name }): Promise<CallToolResult> => {
       return { content: [{ type: "text", text: `Hello, ${name}!` }] };
     }
@@ -103,10 +102,10 @@ async function createTestAuthServer(config: TestServerConfig = { sessionIdGenera
     { capabilities: { logging: {} } }
   );
 
-  mcpServer.tool(
+  mcpServer.tool<{ active: boolean }>(
     "profile",
     "A user profile data tool",
-    { active: z.boolean().describe("Profile status") },
+    { type: "object", properties: { active: { type: "boolean" } }, required: ["active"] },
     async ({ active }, { authInfo }): Promise<CallToolResult> => {
       return { content: [{ type: "text", text: `${active ? 'Active' : 'Inactive'} profile from token: ${authInfo?.token}!` }] };
     }
@@ -375,10 +374,10 @@ describe("StreamableHTTPServerTransport", () => {
   it("should pass request info to tool callback", async () => {
     sessionId = await initializeServer();
 
-    mcpServer.tool(
+    mcpServer.tool<{ name: string }>(
       "test-request-info",
       "A simple test tool with request info",
-      { name: z.string().describe("Name to greet") },
+      { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
       async ({ name }, { requestInfo }): Promise<CallToolResult> => {
         return { content: [{ type: "text", text: `Hello, ${name}!` }, { type: "text", text: `${JSON.stringify(requestInfo)}` }] };
       }
