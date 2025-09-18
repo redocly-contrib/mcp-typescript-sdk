@@ -44,7 +44,7 @@
     "build": "npm run build:esm",
     "build:esm": "mkdir -p dist/esm && echo '{\"type\": \"module\"}' > dist/esm/package.json && tsc -p tsconfig.prod.json",
     "build:esm:w": "npm run build:esm -- -w",
-    "prepack": "npm run build:esm && npm run build:cjs",
+    "prepack": "npm run build:esm",
     "lint": "eslint src/",
     "test": "npm run fetch:spec-types && jest",
     "start": "npm run server",
