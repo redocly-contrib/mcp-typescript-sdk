@@ -1,11 +1,8 @@
 import { Server, ServerOptions } from "./index.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import {
   z,
-  ZodRawShape,
   ZodObject,
   ZodString,
-  AnyZodObject,
   ZodTypeAny,
   ZodType,
   ZodTypeDef,
@@ -42,7 +39,7 @@ import {
   ServerNotification,
   ToolAnnotations,
   LoggingMessageNotification,
-  ToolInputSchema,
+  ToolIOSchema,
 } from "../types.js";
 import { Completable, CompletableDef } from "./completable.js";
 import { UriTemplate, Variables } from "../shared/uriTemplate.js";
@@ -126,9 +123,7 @@ export class McpServer {
             };
 
             if (tool.outputSchema) {
-              toolDefinition.outputSchema = zodToJsonSchema(tool.outputSchema, {
-                strictUnions: true,
-              }) as Tool["outputSchema"];
+              toolDefinition.outputSchema = tool.outputSchema as Tool["outputSchema"];
             }
 
             return toolDefinition;
@@ -216,14 +211,20 @@ export class McpServer {
             );
           }
 
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          const ajv = new Ajv({ allErrors: true });
+          const validate = ajv.compile(tool.outputSchema);
+          const parseResult = validate(result.structuredContent);
+
           // if the tool has an output schema, validate structured content
-          const parseResult = await tool.outputSchema.safeParseAsync(
-            result.structuredContent
-          );
-          if (!parseResult.success) {
+
+          if (!parseResult) {
             throw new McpError(
               ErrorCode.InvalidParams,
-              `Invalid structured content for tool ${request.params.name}: ${parseResult.error.message}`
+              `Invalid structured content for tool ${request.params.name}: ${validate.errors
+                ?.map((error: ErrorObject) => error.message)
+                .join(", ")}`
             );
           }
         }
@@ -802,8 +803,8 @@ export class McpServer {
     name: string,
     title: string | undefined,
     description: string | undefined,
-    inputSchema: ToolInputSchema | undefined,
-    outputSchema: ZodRawShape | undefined,
+    inputSchema: ToolIOSchema | undefined,
+    outputSchema: ToolIOSchema | undefined,
     annotations: ToolAnnotations | undefined,
     _meta: Record<string, unknown> | undefined,
     callback: ToolCallback<U | undefined>
@@ -813,7 +814,7 @@ export class McpServer {
       description,
       inputSchema: inputSchema === undefined ? undefined : inputSchema,
       outputSchema:
-        outputSchema === undefined ? undefined : z.object(outputSchema),
+        outputSchema === undefined ? undefined : outputSchema,
       annotations,
       _meta,
       callback,
@@ -929,8 +930,8 @@ export class McpServer {
     }
 
     let description: string | undefined;
-    let inputSchema: ToolInputSchema | undefined;
-    let outputSchema: ZodRawShape | undefined;
+    let inputSchema: ToolIOSchema | undefined;
+    let outputSchema: ToolIOSchema | undefined;
     let annotations: ToolAnnotations | undefined;
 
     // Tool properties are passed as separate arguments, with omissions allowed.
@@ -946,8 +947,8 @@ export class McpServer {
       const firstArg = rest[0];
 
       if (isObject(firstArg)) {
-        if (isToolInputSchema(firstArg)) {
-          inputSchema = rest.shift() as ToolInputSchema;
+        if (isToolIOSchema(firstArg)) {
+          inputSchema = rest.shift() as ToolIOSchema;
         }
 
         // We have a params schema as the first arg
@@ -957,7 +958,7 @@ export class McpServer {
           rest.length > 1 &&
           typeof rest[0] === "object" &&
           rest[0] !== null &&
-          !isToolInputSchema(rest[0])
+          !isToolIOSchema(rest[0])
         ) {
           // Case: tool(name, paramsSchema, annotations, cb)
           // Or: tool(name, description, paramsSchema, annotations, cb)
@@ -989,8 +990,8 @@ export class McpServer {
    */
   registerTool<
     U,
-    InputArgs extends ToolInputSchema,
-    OutputArgs extends ZodRawShape
+    InputArgs extends ToolIOSchema,
+    OutputArgs extends ToolIOSchema
   >(
     name: string,
     config: {
@@ -1257,20 +1258,20 @@ export type ToolCallback<Args = undefined> = Args extends undefined
 export type RegisteredTool<U = undefined> = {
   title?: string;
   description?: string;
-  inputSchema?: ToolInputSchema;
-  outputSchema?: AnyZodObject;
+  inputSchema?: ToolIOSchema;
+  outputSchema?: ToolIOSchema;
   annotations?: ToolAnnotations;
   _meta?: Record<string, unknown>;
   callback: ToolCallback<undefined | U>;
   enabled: boolean;
   enable(): void;
   disable(): void;
-  update<UpdatedType, OutputArgs extends AnyZodObject>(updates: {
+  update<UpdatedType>(updates: {
     name?: string | null;
     title?: string;
     description?: string;
-    paramsSchema?: ToolInputSchema;
-    outputSchema?: OutputArgs;
+    paramsSchema?: ToolIOSchema;
+    outputSchema?: ToolIOSchema;
     annotations?: ToolAnnotations;
     _meta?: Record<string, unknown>;
     callback?: ToolCallback<UpdatedType>;
@@ -1291,7 +1292,7 @@ function isObject(obj: unknown): obj is Record<string, unknown> {
   return Object.keys(obj).length > 0;
 }
 
-function isToolInputSchema(obj: unknown): obj is ToolInputSchema {
+function isToolIOSchema(obj: unknown): obj is ToolIOSchema {
   if (typeof obj !== "object" || obj === null) return false;
 
   return "type" in obj && obj.type === "object";

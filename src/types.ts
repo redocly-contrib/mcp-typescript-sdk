@@ -1526,7 +1526,7 @@ export interface ToolAnnotations {
   [key: string]: unknown;
 }
 
-export interface ToolInputSchema {
+export interface ToolIOSchema {
   type: "object";
   properties?: { [key: string]: unknown };
   required?: string[];
@@ -1544,17 +1544,13 @@ export interface Tool extends BaseMetadata {
   /**
    * A JSON Schema object defining the expected parameters for the tool.
    */
-  inputSchema: ToolInputSchema;
+  inputSchema: ToolIOSchema;
   /**
    * An optional JSON Schema object defining the structure of the tool's output returned in
    * the structuredContent field of a CallToolResult.
    */
-  outputSchema?: {
-    type: "object";
-    properties?: { [key: string]: unknown };
-    required?: string[];
-    [key: string]: unknown;
-  };
+  outputSchema?: ToolIOSchema;
+
   /**
    * Optional additional tool information.
    */

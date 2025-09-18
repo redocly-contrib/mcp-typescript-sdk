@@ -1,7 +1,7 @@
 import { McpServer } from "./mcp.js";
 import { Client } from "../__mocks__/client.js";
 import { InMemoryTransport } from "../inMemory.js";
-import { z, ZodObject, ZodRawShape } from "zod";
+import { z  } from "zod";
 import {
   Notification,
   TextContent,
@@ -338,7 +338,7 @@ describe("tool()", () => {
     }));
 
     // Update the tool
-    tool.update<undefined, ZodObject<ZodRawShape>>({
+    tool.update<undefined>({
       callback: async () => ({
         content: [
           {
@@ -417,7 +417,7 @@ describe("tool()", () => {
     );
 
     // Update the tool with a different schema
-    tool.update<{ name: string; value: number }, ZodObject<ZodRawShape>>({
+    tool.update<{ name: string; value: number }>({
       paramsSchema: {
         type: "object",
         properties: {
@@ -524,7 +524,7 @@ describe("tool()", () => {
     expect(notifications).toHaveLength(0);
 
     // Now update the tool
-    tool.update<undefined, ZodObject<ZodRawShape>>({
+    tool.update<undefined>({
       callback: async () => ({
         content: [
           {
@@ -1158,9 +1158,13 @@ describe("tool()", () => {
           required: ["input"],
         },
         outputSchema: {
-          processedInput: z.string(),
-          resultType: z.string(),
-          timestamp: z.string(),
+          type: "object",
+          properties: {
+            processedInput: { type: "string" },
+            resultType: { type: "string" },
+            timestamp: { type: "string" },
+          },
+          required: ["processedInput", "resultType", "timestamp"],
         },
       },
       async ({ input }) => ({
@@ -1269,8 +1273,12 @@ describe("tool()", () => {
           required: ["input"],
         },
         outputSchema: {
-          processedInput: z.string(),
-          resultType: z.string(),
+          type: "object",
+          properties: {
+            processedInput: { type: "string" },
+            resultType: { type: "string" },
+          },
+          required: ["processedInput", "resultType"],
         },
       },
       async ({ input }) => ({
@@ -1331,8 +1339,12 @@ describe("tool()", () => {
           required: ["input"],
         },
         outputSchema: {
-          processedInput: z.string(),
-          resultType: z.string(),
+          type: "object",
+          properties: {
+            processedInput: { type: "string" },
+            resultType: { type: "string" },
+          },
+          required: ["processedInput", "resultType"],
         },
       },
       async ({ input }) => ({
@@ -1399,9 +1411,14 @@ describe("tool()", () => {
           required: ["input"],
         },
         outputSchema: {
-          processedInput: z.string(),
-          resultType: z.string(),
-          timestamp: z.string(),
+          type: "object",
+          properties: {
+            processedInput: { type: "string" },
+            resultType: { type: "string" },
+            timestamp: { type: "string" },
+          },
+          additionalProperties: false,
+          required: ["processedInput", "resultType", "timestamp"],
         },
       },
       async ({ input }) => ({
@@ -4022,7 +4039,7 @@ describe("Tool title precedence", () => {
     );
 
     // Tool 3: Name and title (using registerTool)
-    mcpServer.registerTool<object, { type: "object" }, ZodRawShape>(
+    mcpServer.registerTool<object, { type: "object" }, { type: "object" }>(
       "tool_with_title",
       {
         title: "Regular Title",
@@ -4034,7 +4051,7 @@ describe("Tool title precedence", () => {
     );
 
     // Tool 4: All three - title should win
-    mcpServer.registerTool<object, { type: "object" }, ZodRawShape>(
+    mcpServer.registerTool<object, { type: "object" }, { type: "object" }>(
       "tool_with_all_titles",
       {
         title: "Regular Title Wins",
